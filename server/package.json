@@ -1,0 +1,25 @@
+{
+  "name": "armored-heroes-server",
+  "version": "0.1.0",
+  "description": "Backend del juego Armored Heroes",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "build": "echo \"Build step not required for Node.js\"",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "mongoose": "^8.0.0",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.1.1",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "nodemon": "^3.0.1"
+  }
+}
