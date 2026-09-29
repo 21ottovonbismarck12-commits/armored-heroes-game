@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema(
 // Hash password antes de guardar
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   
   try {

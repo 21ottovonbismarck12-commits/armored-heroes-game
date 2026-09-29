@@ -1,0 +1,35 @@
+.game-module {
+  width: min(1180px, 100%);
+  height: calc(100vh - 140px);
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid #8f55c7;
+  border-radius: 12px;
+  background: #0d0f09;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, .45);
+}
+.game-module-toolbar {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  color: #e8e3d0;
+  background: #11141a;
+  font-size: .8rem;
+}
+.game-module-hint { color: #9aa07a; }
+.game-module-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #0d0f09;
+}
+@media (max-width: 700px) {
+  .game-module { height: calc(100vh - 90px); min-height: 420px; border-radius: 0; }
+  .game-module-toolbar { font-size: .68rem; }
+  .game-module-hint { display: none; }
+}

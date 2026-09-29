@@ -1,11 +1,11 @@
 export const calculateDamage = (attacker, defender) => {
-  const baseAttack = attacker.stats.attack;
-  const defense = defender.stats.defense;
+  const baseAttack = attacker.attack;
+  const defense = defender.defense;
   const variance = Math.random() * 0.2 - 0.1;
   
   let damage = Math.max(1, baseAttack - defense + (baseAttack * variance));
   
-  if (Math.random() * 100 < attacker.stats.criticalChance) {
+  if (Math.random() * 100 < (attacker.criticalChance || 0)) {
     damage *= 1.5;
   }
   

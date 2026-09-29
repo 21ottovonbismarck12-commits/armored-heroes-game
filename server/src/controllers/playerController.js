@@ -77,10 +77,9 @@ export const addExperience = async (req, res) => {
     }
 
     player.experience += amount;
-    const expNeeded = player.level * 100;
-
     let leveledUp = false;
-    while (player.experience >= expNeeded) {
+    while (player.experience >= player.level * 100) {
+      const expNeeded = player.level * 100;
       player.level += 1;
       player.experience -= expNeeded;
       leveledUp = true;

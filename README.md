@@ -1,66 +1,63 @@
 # Armored Heroes Online
 
-Un juego multiplayer online similar a "Armored Heroes" con sistema de progresión, equipamiento, mejoras y gacha.
+Plataforma web de combate blindado con autenticación, progresión, equipamiento y multijugador base. Incluye el juego Canvas **Tank Commander** como módulo jugable integrado.
 
 ## Características
 
-- 🎮 **Multijugador en línea** - Combate en tiempo real con otros jugadores
-- ⚔️ **Sistema de combate por turnos** - Estrategia y tácticas
-- 🛡️ **Equipamiento y mejoras** - Diferentes armaduras, armas y accesorios
-- 📈 **Sistema de progresión** - Niveles, experiencia y estadísticas
-- 🎰 **Sistema Gacha** - Obtén equipamiento raro de forma aleatoria
-- 📱 **Multiplataforma** - Web (navegador) y potencial para móvil
+- **Frontend React + Vite** con login, registro y lobby.
+- **Servidor Node.js + Express + Socket.io**.
+- **Persistencia MongoDB** para usuarios, jugadores, inventario y registros de combate.
+- **Combate por turnos** con recompensas y generación de objetos.
+- **Tank Commander integrado** en `client/public/tank-commander.html`, cargado desde `GameCanvas.jsx`.
+- **Recursos del juego** en `client/public/`, incluida la imagen `loco.jpg`.
 
-## Tecnología
+## Estructura
 
-- **Frontend**: React + TypeScript + Phaser 3 (motor de juegos)
-- **Backend**: Node.js + Express + Socket.io (multiplayer)
-- **Base de datos**: MongoDB
-- **Deployment**: Docker + Vercel/Heroku
-
-## Estructura del Proyecto
-
-```
+```text
 armored-heroes-game/
-├── client/              # Frontend (React + Phaser)
-├── server/              # Backend (Node.js)
-├── shared/              # Código compartido
-├── docker-compose.yml
+├── client/
+│   ├── index.html
+│   ├── src/
+│   │   ├── components/
+│   │   │   └── GameCanvas.jsx       # módulo Tank Commander
+│   │   └── main.jsx
+│   └── public/
+│       ├── tank-commander.html
+│       └── loco.jpg
+├── server/
+│   └── src/
+├── INTEGRATION.md
 └── package.json
 ```
 
 ## Instalación
 
-### Requisitos
-- Node.js 18+
-- npm o yarn
-- MongoDB (local o Atlas)
-
-### Setup local
+Requisitos: Node.js 18+, npm y MongoDB local o Atlas.
 
 ```bash
-# Instalar dependencias
-npm install
-
-# Desarrollo
+npm run install:all
+cp server/.env.example server/.env
+# Edita server/.env con MONGODB_URI y JWT_SECRET
 npm run dev
+```
 
-# Producción
+El cliente se sirve con Vite y el servidor escucha normalmente en el puerto `3001`. Para producción:
+
+```bash
 npm run build
 npm start
 ```
 
-## Roadmap
+## Integración
 
-- [ ] Estructura base frontend/backend
-- [ ] Sistema de autenticación
-- [ ] Interfaz del jugador
-- [ ] Motor de combate
-- [ ] Sistema de equipamiento
-- [ ] Sistema Gacha
-- [ ] Multijugador
-- [ ] Persistencia de datos
-- [ ] Leaderboards
+La integración es modular: React gestiona la cuenta y el lobby, mientras que el juego Canvas conserva su ciclo de renderizado y se muestra dentro de un iframe. Esto evita mezclar de forma insegura el estado de React con el estado interno del juego. Consulta [INTEGRATION.md](./INTEGRATION.md) para conocer la decisión y una posible evolución con `postMessage`.
+
+## Validación realizada
+
+- `npm run build` pasa para cliente y servidor.
+- Todos los imports locales existen.
+- El motor de combate fue probado con una simulación real.
+- La dependencia inválida `jsonwebtoken@^9.1.1` se corrigió a `^9.0.3`.
 
 ## Licencia
 

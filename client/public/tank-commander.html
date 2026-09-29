@@ -1,0 +1,2420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Tank Commander - Batallas Blindadas</title>
+<style>
+  :root{
+    --bg:#1a1d13; --panel:#2b2f1f; --accent:#c9a227; --accent2:#7a8450;
+    --hp:#3fae3f; --hp-low:#c0392b; --text:#e8e3d0; --steel:#5c5f52;
+    --ui-red:#c83b35; --ui-green:#35b957; --ui-brown:#80522f; --ui-white:#f2eee0;
+    --ui-black:#11141a; --ui-yellow:#f2c532; --ui-blue:#3d91d9; --ui-purple:#8f55c7;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:#0d0f09;font-family:'Courier New',monospace;color:var(--text);overflow:hidden;overscroll-behavior:none;touch-action:none;}
+  #wrap{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;touch-action:none;}
+  canvas{background:#7fa8c9;display:block;image-rendering:pixelated;box-shadow:0 0 40px #000;border:3px solid #4a4d3a;width:100%;max-width:900px;max-height:100vh;height:auto;touch-action:none;}
+  #hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px 16px;pointer-events:none;font-size:13px;letter-spacing:1px;text-shadow:1px 1px 2px #000;}
+  .hud-box{background:rgba(20,22,14,0.7);border:1px solid var(--steel);padding:6px 12px;border-radius:3px;}
+  #hpbar{width:160px;height:14px;background:#111;border:1px solid #000;margin-top:4px;position:relative;overflow:hidden;}
+  #hpfill{height:100%;background:var(--hp);width:100%;transition:width .15s;}
+  #progressbar{width:220px;height:8px;background:#111;border:1px solid #000;margin-top:4px;}
+  #progressfill{height:100%;background:var(--accent);width:0%;}
+  #screen{position:absolute;inset:0;background:rgba(8,10,5,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px;z-index:10;overflow:hidden;}
+  #coverArt{position:absolute;inset:0;z-index:0;}
+  #coverArt svg{width:100%;height:100%;display:block;}
+  #startPanel{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:16px;background:rgba(10,10,6,0.68);border:1px solid rgba(201,162,39,0.4);border-radius:6px;padding:22px 28px;max-width:560px;margin-top:auto;margin-bottom:36px;}
+  h1{font-size:38px;color:var(--accent);letter-spacing:4px;margin:0;text-shadow:2px 2px 0 #000;}
+  h2{color:var(--accent);letter-spacing:2px;margin:0 0 4px;}
+  p{max-width:620px;line-height:1.5;color:#cfcab8;font-size:13px;}
+  button{background:var(--accent2);border:2px solid var(--accent);color:#1a1d13;font-family:inherit;font-weight:bold;padding:10px 26px;font-size:15px;letter-spacing:2px;cursor:pointer;border-radius:2px;}
+  button:hover{background:var(--accent);}
+  button:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.7);}
+  .secondary-btn{background:transparent;border-color:rgba(201,162,39,0.6);color:var(--accent);}
+  .secondary-btn:hover{background:rgba(201,162,39,0.15);color:var(--accent);}
+
+  /* ---- Mapa estratégico de campaña ---- */
+  #mapWrap{width:100%;max-width:640px;max-height:62vh;overflow-y:auto;padding:4px;scrollbar-color:var(--accent2) rgba(0,0,0,0.3);}
+  .mapBand{border-radius:8px;padding:14px 12px 18px;margin-bottom:12px;position:relative;border:1px solid rgba(255,255,255,0.15);box-shadow:inset 0 0 30px rgba(0,0,0,0.35);}
+  .mapBandLabel{font-size:12px;letter-spacing:1.5px;font-weight:bold;color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,0.8);margin-bottom:10px;text-align:left;}
+  .mapNodes{display:flex;align-items:center;justify-content:space-between;position:relative;}
+  .mapLine{flex:1;height:3px;background:rgba(255,255,255,0.35);margin:0 2px;}
+  .mapNode{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:bold;font-size:13px;flex-shrink:0;border:2px solid rgba(0,0,0,0.4);cursor:pointer;
+    color:#1a1d13;background:#8a8f7a;transition:transform .15s;}
+  .mapNode:hover{transform:scale(1.12);}
+  .mapNode.done{background:#3fae3f;color:#0d1a0d;}
+  .mapNode.current{background:var(--accent);color:#1a1408;box-shadow:0 0 0 4px rgba(201,162,39,0.4);animation:pulse 1.4s infinite;}
+  .mapNode.locked{background:#3a3a34;color:#66665e;cursor:not-allowed;border-color:rgba(0,0,0,0.5);}
+  .mapNode.locked:hover{transform:none;}
+  .mapNode.selected{outline:2px solid #fff;outline-offset:3px;}
+  .mapSubLabel{font-size:9px;color:rgba(255,255,255,0.75);text-align:center;margin-top:5px;letter-spacing:.4px;}
+  .mapLegend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#bdb9a8;margin-top:8px;}
+  .mapLegend span{display:inline-flex;align-items:center;gap:5px;}
+  .mapLegend i{display:inline-block;width:10px;height:10px;border-radius:50%;border:1px solid #111;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(201,162,39,0.4);}50%{box-shadow:0 0 0 8px rgba(201,162,39,0.15);}}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:820px;}
+  .shopcard{background:var(--panel);border:1px solid var(--steel);padding:12px 16px;width:190px;font-size:12px;}
+  .shopcard h3{margin:0 0 6px;color:var(--accent);font-size:13px;}
+  .reference-art{width:310px;max-height:110px;object-fit:cover;object-position:center 48%;border:2px solid rgba(255,255,255,.25);border-radius:7px;opacity:.78;filter:saturate(.82) contrast(1.05);box-shadow:0 8px 22px rgba(0,0,0,.5);}
+  .command-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .command-actions button{font-size:11px;padding:9px 12px;letter-spacing:1px;color:#fff;border-color:rgba(255,255,255,.45);}
+  .action-start{background:var(--ui-black);border-color:#8391a2 !important;}
+  .action-map{background:var(--ui-white);color:#25221c !important;border-color:#fff !important;}
+  .action-upgrade{background:var(--ui-green);}
+  .action-ammo{background:var(--ui-brown);}
+  .action-delete{background:var(--ui-red);}
+  .wallets{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:11px;}
+  .wallet{padding:5px 9px;border-radius:4px;border:1px solid currentColor;background:rgba(0,0,0,.35);}
+  .wallet.ammo-wallet{color:#ffe178;}.wallet.parts-wallet{color:#83c5ff;}
+  .garage-toolbar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:4px 0 8px;}
+  .garage-toolbar button{font-size:11px;padding:7px 12px;letter-spacing:1px;}
+  .ammo-shop{background:rgba(128,82,47,.22);border:1px solid #a7764d;padding:10px;margin:8px auto;max-width:640px;}
+  .ammo-shop h3{color:#d7a16d;margin:0 0 5px;font-size:13px;}
+  .ammo-shop button{background:var(--ui-brown);border-color:#d7a16d;font-size:11px;padding:6px 10px;}
+  .upgrade-accent{border-color:var(--ui-green) !important;background:rgba(53,185,87,.18) !important;}
+  .delete-accent{background:var(--ui-red);border-color:#f07d70;color:#fff;}
+  .hidden{display:none !important;}
+  #garageStage{position:relative;width:380px;height:360px;flex-shrink:0;}
+  #garageCanvas{position:absolute;top:0;left:0;background:#20241a;border:2px solid var(--steel);}
+  .hotspot{position:absolute;border:2px dashed transparent;cursor:pointer;transition:background .15s,border-color .15s;}
+  .hotspot:hover{border-color:var(--accent);background:rgba(201,162,39,0.18);}
+  .hotspot.selected{border-color:var(--accent);background:rgba(201,162,39,0.28);}
+  .hotspot-label{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:9px;color:var(--accent);opacity:0;pointer-events:none;transition:opacity .15s;}
+  .hotspot:hover .hotspot-label{opacity:1;}
+  #partsPanel{width:300px;min-height:240px;max-height:340px;overflow-y:auto;background:var(--panel);border:1px solid var(--steel);padding:14px;text-align:left;font-size:12px;}
+  #partsPanel .partRow{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--steel);}
+  #partsPanel .partRow button{padding:5px 14px;font-size:12px;margin-top:4px;}
+  #partsPanel .partName{font-weight:bold;color:var(--text);}
+  #partsPanel .partFrom{color:#9aa07a;font-size:10px;}
+  #partsPanel .partDesc{font-size:11px;margin:4px 0;color:#cfcab8;}
+  #ammoInd span{padding:2px 6px;border:1px solid var(--steel);margin-left:4px;pointer-events:auto;cursor:pointer;touch-action:manipulation;}
+  #ammoInd .active{background:var(--accent);color:#111;}
+  #roundsRow{margin-top:4px;}
+  #reloadStatus{margin-top:4px;color:#e08a4a;font-weight:bold;}
+
+  /* ---- Controles táctiles: visibles únicamente en teléfonos/tablets ---- */
+  #touchControls{position:absolute;inset:0;pointer-events:none;z-index:8;user-select:none;-webkit-user-select:none;}
+  .tbtn{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;
+    background:rgba(43,47,31,0.55);border:2px solid rgba(201,162,39,0.5);border-radius:50%;
+    color:var(--accent);font-size:22px;font-weight:bold;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;}
+  .tbtn:active, .tbtn.pressed{background:rgba(201,162,39,0.45);border-color:var(--accent);}
+  #btnLeft{left:18px;bottom:26px;width:64px;height:64px;}
+  #btnRight{left:92px;bottom:26px;width:64px;height:64px;}
+  #btnTurretUp{right:24px;bottom:126px;width:56px;height:56px;}
+  #btnTurretDown{right:24px;bottom:26px;width:56px;height:56px;}
+  #btnFire{right:100px;bottom:40px;width:84px;height:84px;background:rgba(160,50,40,0.55);border-color:#e08a4a;color:#fff;font-size:14px;letter-spacing:1px;}
+  #btnFire:active, #btnFire.pressed{background:rgba(224,90,50,0.7);}
+  #btnArtillery{right:196px;bottom:54px;width:76px;height:52px;border-radius:8px;font-size:10px;line-height:1.1;text-align:center;background:rgba(91,65,32,.7);}
+  #btnArtillery.ready{border-color:#f0c34a;color:#ffe6a0;box-shadow:0 0 12px rgba(240,195,74,.35);}
+  #btnArtillery.active{background:rgba(190,110,35,.82);border-color:#fff0a0;}
+  @media (hover:hover) and (pointer:fine){#touchControls{display:none !important;}}
+  @media (max-width:600px){
+    #hud{font-size:11px;padding:6px 8px;}
+    .hud-box{padding:4px 8px;}
+    #hpbar{width:110px;}
+    #progressbar{width:150px;}
+  }
+  #toast{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);font-size:22px;color:var(--accent);text-shadow:2px 2px #000;pointer-events:none;opacity:0;transition:opacity .3s;z-index:5;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="900" height="620"></canvas>
+
+  <div id="hud">
+    <div class="hud-box">
+      <div>COMANDANTE // CAMPAÑA-SUBNIVEL <span id="lvlNum">1-1</span></div>
+      <div id="hpbar"><div id="hpfill"></div></div>
+      <div id="progressbar"><div id="progressfill"></div></div>
+    </div>
+    <div class="hud-box" id="ammoInd">
+      <div id="gunLabel">MUNICIÓN:
+      <span id="ammoAP" class="active">AP (1)</span>
+      <span id="ammoHE">HE (2)</span></div>
+      <div id="roundsRow">RONDAS: <span id="roundsLeft">20</span>/<span id="roundsMax">20</span></div>
+      <div id="reloadStatus" class="hidden">RECARGANDO… <span id="reloadSecs">0</span>s</div>
+    </div>
+    <div class="hud-box">
+      ENEMIGOS: <span id="enemyCount">0</span> &nbsp;|&nbsp; CRÉDITOS: <span id="credits">0</span>
+    </div>
+    <div class="hud-box" id="artilleryHud">ARTILLERÍA: <span id="artilleryStatus">LISTA [Q]</span></div>
+  </div>
+
+  <div id="touchControls">
+    <div class="tbtn" id="btnLeft">◄</div>
+    <div class="tbtn" id="btnRight">►</div>
+    <div class="tbtn" id="btnTurretUp">▲</div>
+    <div class="tbtn" id="btnTurretDown">▼</div>
+    <div class="tbtn" id="btnFire">FUEGO</div>
+    <div class="tbtn ready" id="btnArtillery">LLAMAR<br>ARTILLERÍA</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="screen">
+    <div id="coverArt"><svg viewBox="0 0 680 480" preserveAspectRatio="xMidYMid slice" role="img">
+<title>Portada de Tank Commander</title>
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#151a2e"/>
+<stop offset="45%" stop-color="#3d3350"/>
+<stop offset="72%" stop-color="#c9683f"/>
+<stop offset="100%" stop-color="#f2a35a"/>
+</linearGradient>
+<linearGradient id="sunGlow" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#ffd98a"/>
+<stop offset="100%" stop-color="#ff9d4d"/>
+</linearGradient>
+<linearGradient id="haze" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#f7c27b" stop-opacity="0"/>
+<stop offset="48%" stop-color="#f6b46d" stop-opacity=".38"/>
+<stop offset="100%" stop-color="#d96244" stop-opacity="0"/>
+</linearGradient>
+<filter id="softGlow"><feGaussianBlur stdDeviation="12"/></filter>
+</defs>
+<rect x="0" y="0" width="680" height="480" fill="url(#sky)"/>
+<circle cx="500" cy="255" r="88" fill="#ffb45f" opacity=".24" filter="url(#softGlow)"/>
+<circle cx="500" cy="255" r="62" fill="url(#sunGlow)"/>
+<path d="M0 275 C120 246 198 276 298 252 S492 258 680 225 L680 318 L0 318Z" fill="url(#haze)" opacity=".6"/>
+<g fill="#f3d5a2" opacity=".2">
+  <path d="M42 88h108l18 10H25z"/><path d="M176 122h142l22 11H152z"/><path d="M455 78h105l20 10H438z"/>
+</g>
+<g fill="#181b1d" opacity=".48">
+  <path d="M40 283 q8-22 16 0 q8-30 16 0 q8-18 16 0z"/>
+  <path d="M610 278 q8-25 16 0 q8-34 16 0 q8-20 16 0z"/>
+</g>
+<path d="M0,320 Q90,295 180,318 T360,312 T540,322 T680,308 L680,480 L0,480 Z" fill="#2a2318" opacity="0.9"/>
+<g fill="#100d08">
+<rect x="95" y="304" width="34" height="10" rx="1"/><rect x="103" y="292" width="11" height="7"/><rect x="113" y="294" width="16" height="2.5"/>
+<rect x="440" y="316" width="30" height="9" rx="1"/><rect x="447" y="305" width="10" height="6"/><rect x="456" y="307" width="14" height="2.2"/>
+<rect x="580" y="300" width="28" height="9" rx="1"/><rect x="587" y="289" width="10" height="6"/><rect x="596" y="291" width="13" height="2.2"/>
+</g>
+<path d="M0,352 Q120,332 260,350 T520,344 T680,354 L680,480 L0,480 Z" fill="#191410"/>
+<rect x="0" y="392" width="680" height="88" fill="#0c0a07"/>
+<g stroke="#11100d" stroke-width="2" opacity=".72">
+  <path d="M18 380 l38-18 22 10 42-21 32 16 40-13 36 16 50-20 34 17 45-13 38 17 44-22 45 17 40-14 38 16 54-20 42 17" fill="none"/>
+  <path d="M520 348v44M548 350v42M576 345v47"/>
+</g>
+<g fill="#25221a" opacity=".9">
+  <path d="M250 355 l12-27 9 27 12-19 9 19z"/><path d="M390 353 l11-31 10 31 13-21 8 21z"/>
+</g>
+<g transform="translate(96,432) scale(2.55)">
+<rect x="-40" y="-13" width="80" height="18" rx="8" fill="#0a0908"/>
+<g fill="#050403"><circle cx="-33" cy="-3" r="7"/><circle cx="-16.5" cy="-3" r="7"/><circle cx="0" cy="-3" r="7"/><circle cx="16.5" cy="-3" r="7"/><circle cx="33" cy="-3" r="7"/><circle cx="-42" cy="-4" r="8.5"/><circle cx="42" cy="-4" r="8.5"/></g>
+<rect x="-38" y="-27" width="76" height="16" rx="2" fill="#3a4530"/>
+<rect x="-24" y="-40" width="48" height="14" rx="2" fill="#333d29"/>
+<path d="M-16,-33 L16,-33 L9,-49 L-9,-49 Z" fill="#2c3524"/>
+<path d="M10,-43 L104,-58" stroke="#141210" stroke-width="7" stroke-linecap="round"/>
+<ellipse cx="-14" cy="-33" rx="15" ry="6" fill="#4a3826" opacity="0.75"/>
+<ellipse cx="10" cy="-19" rx="12" ry="5" fill="#c9b988" opacity="0.55"/>
+</g>
+<text x="340" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="64" font-weight="700" letter-spacing="6" fill="#f3ead8" stroke="#1a1408" stroke-width="2">TANK COMMANDER</text>
+<text x="340" y="188" text-anchor="middle" font-family="Georgia, serif" font-size="21" letter-spacing="4" fill="#e8823c">BATALLAS BLINDADAS</text>
+<text x="340" y="216" text-anchor="middle" font-family="Georgia, serif" font-size="14" letter-spacing="2" fill="#c9b988">5 CAMPAÑAS · TANQUES HISTÓRICOS · GARAGE DE REPUESTOS</text>
+</svg></div>
+    <div id="startPanel">
+    <img class="reference-art" src="loco.jpg" alt="Centro de mando y garage blindado">
+    <p>Comanda tu blindado a través de cinco frentes históricos y conquista cada ruta estratégica.</p>
+    <div class="wallets"><span class="wallet ammo-wallet">◆ MUNICIÓN: <b id="menuAmmoCoins">20</b></span><span class="wallet parts-wallet">◆ PARTES: <b id="menuPartsCoins">0</b></span></div>
+    <div class="command-actions">
+      <button id="startBtn" class="action-start" disabled>COMPLETA EL TUTORIAL PRIMERO</button>
+      <button id="tutorialBtn" class="secondary-btn">VER TUTORIAL</button>
+      <button id="mapBtn" class="action-map">MAPA</button>
+      <button id="upgradeBtn" class="action-upgrade">MEJORAS</button>
+      <button id="ammoBtn" class="action-ammo">MUNICIÓN</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+(() => {
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const screenEl = document.getElementById('screen');
+const START_SCREEN_HTML = screenEl.innerHTML;
+const startBtn = document.getElementById('startBtn');
+const tutorialBtn = document.getElementById('tutorialBtn');
+const upgradeBtn = document.getElementById('upgradeBtn');
+const ammoBtn = document.getElementById('ammoBtn');
+const menuAmmoCoinsEl = document.getElementById('menuAmmoCoins');
+const menuPartsCoinsEl = document.getElementById('menuPartsCoins');
+const hpfill = document.getElementById('hpfill');
+const progressfill = document.getElementById('progressfill');
+const lvlNumEl = document.getElementById('lvlNum');
+const enemyCountEl = document.getElementById('enemyCount');
+const creditsEl = document.getElementById('credits');
+const ammoAPEl = document.getElementById('ammoAP');
+const ammoHEEl = document.getElementById('ammoHE');
+const roundsLeftEl = document.getElementById('roundsLeft');
+const roundsMaxEl = document.getElementById('roundsMax');
+const reloadStatusEl = document.getElementById('reloadStatus');
+const reloadSecsEl = document.getElementById('reloadSecs');
+const gunLabelEl = document.getElementById('gunLabel');
+const toastEl = document.getElementById('toast');
+const artilleryStatusEl = document.getElementById('artilleryStatus');
+const artilleryBtnEl = document.getElementById('btnArtillery');
+
+function toast(msg, ms=1400){
+  toastEl.textContent = msg;
+  toastEl.style.opacity = 1;
+  setTimeout(()=>toastEl.style.opacity=0, ms);
+}
+
+// ---------- State ----------
+let keys = {};
+let mouseDown = false;
+let credits = 0;
+let ammoCoins = 20;
+let partsCoins = 0;
+let ammoReserve = 0;
+let level = 1;
+const MAX_LEVEL = 25; // 5 campañas x 5 subniveles
+const campaignNames = ["Frente Occidental","Invierno Ruso","Norte de África","Operación Barbarroja","Campaña del Pacífico"];
+let campaign = 1, subLevel = 1; // derivados de `level` en cada initLevel()
+
+// Paleta visual de cada campaña: mismo tema, pero cada subnivel varía un poco el tono/terreno
+const CAMPAIGN_PALETTES = [
+  null,
+  { skyTop:'#7fa8c9', skyBottom:'#bcd7e0', hill:'rgba(70,90,60,0.25)',  ground:'#4d5a34' }, // 1 Frente Occidental
+  { skyTop:'#dfe9ee', skyBottom:'#f0f4f5', hill:'rgba(150,160,170,0.3)',ground:'#e8ecec' }, // 2 Invierno Ruso
+  { skyTop:'#e8c98a', skyBottom:'#f5e2b8', hill:'rgba(180,150,90,0.35)',ground:'#c9a55e' }, // 3 Norte de África
+  { skyTop:'#8a9a8a', skyBottom:'#b9c4b0', hill:'rgba(90,90,60,0.3)',   ground:'#5a5738' }, // 4 Operación Barbarroja
+  { skyTop:'#6ec3d1', skyBottom:'#bfe8e0', hill:'rgba(40,90,50,0.3)',   ground:'#3a5c34' }, // 5 Campaña del Pacífico
+];
+const upgrades = { armor:0, damage:0, speed:0, reload:0 };
+const partsOwned = []; // names of parts already installed
+let equippedGun = 'base'; // 'base' | 'panzerIII' | 'panzerIIIAfrika' | 'bofors37' | 'panzer35t'
+let furthestLevel = 1; // nivel más avanzado alcanzado, para desbloquear nodos en el mapa
+// Qué "look" de tanque histórico se usa para cada parte visual (null = aspecto original de fábrica)
+let equippedVisual = { armor:null, damage:null, speed:null, reload:null };
+
+// Estilo visual de cada tanque de referencia, para modelar cada pieza según su foto real
+const TANK_VISUALS = {
+  panzer3:        { key:'panzer3',        base:'#4d5738', campA:'#3a2f22', campB:'#8f8560', camo:true,  wheelCount:6, wheelR:5.5, rivets:false, schurzen:false, label:'Panzer III "333"' },
+  panzer3_afrika: { key:'panzer3_afrika', base:'#b89a5e', campA:'#7a5c34', campB:'#5c4a30', camo:true,  wheelCount:6, wheelR:5.8, rivets:false, schurzen:true,  label:'Panzer III "625" (Afrika Korps)' },
+  tp7:            { key:'tp7',            base:'#5f6b3f', campA:'#4a3a28', campB:'#8a8354', camo:true,  wheelCount:5, wheelR:7.5, rivets:true,  schurzen:false, label:'7TP (Polonia)' },
+  pz35t:          { key:'pz35t',          base:'#43473c', campA:'#2c2f27', campB:'#61665a', camo:true,  wheelCount:4, wheelR:9.2, rivets:true,  schurzen:false, label:'Panzer 35(t) "131"' },
+  t26_finland:    { key:'t26_finland',    base:'#c9c4b6', campA:'#8a8578', campB:'#5c76a0', camo:true,  wheelCount:6, wheelR:6.2, rivets:true,  schurzen:false, label:'T-26 mod. 1933 (capturado, Finlandia)' },
+  t26_command:    { key:'t26_command',    base:'#57633a', campA:'#8a2a24', campB:'#d8d2c0', camo:true,  wheelCount:6, wheelR:6.2, rivets:true,  schurzen:false, label:'T-26 mod. 1933 "de mando" (URSS)' },
+  bt5:            { key:'bt5',            base:'#4a5732', campA:'#333d22', campB:'#6c7850', camo:true,  wheelCount:4, wheelR:9.6, rivets:false, schurzen:false, label:'BT-5 (URSS)' },
+  m3stuart:       { key:'m3stuart',       base:'#4a3d24', campA:'#2f2717', campB:'#7a6438', camo:true,  wheelCount:4, wheelR:8.6, rivets:true,  schurzen:false, label:'M3 Stuart "USMC 125"' },
+};
+
+// Estadísticas de cada cañón intercambiable del jugador
+const GUN_STATS = {
+  base:            { mag:20, reloadSec:6.8, dmgAP:32, dmgHE:20, bulletSpeed:13, barrelLen:32, barrelW:3.2, useAmmoType:true,  turretSpeed:0.022, label:'Cañón original' },
+  panzerIII:       { mag:1,  reloadSec:3.6, dmg:26,             bulletSpeed:14, barrelLen:30, barrelW:2.8, useAmmoType:false, turretSpeed:0.026, label:'Cañón KwK38 del Panzer III' },
+  panzerIIIAfrika: { mag:1,  reloadSec:3.6, dmg:26,             bulletSpeed:14, barrelLen:30, barrelW:2.8, useAmmoType:false, turretSpeed:0.025, label:'Cañón KwK38 del Panzer III (Afrika Korps)' },
+  bofors37:        { mag:1,  reloadSec:2.7, dmg:20,             bulletSpeed:16, barrelLen:26, barrelW:2.4, useAmmoType:false, turretSpeed:0.030, label:'Cañón Bofors del 7TP' },
+  panzer35t:       { mag:1,  reloadSec:4.1, dmg:22,             bulletSpeed:13, barrelLen:27, barrelW:2.6, useAmmoType:false, turretSpeed:0.024, label:'Cañón Škoda del Panzer 35(t)' },
+  bofors40:        { mag:4,  reloadSec:5.5, dmg:24,             bulletSpeed:15, barrelLen:34, barrelW:2.6, useAmmoType:false, turretSpeed:0.020, label:'Cañón Bofors 40 mm' },
+  oerlikon20:      { mag:7,  reloadSec:3.0, dmg:12,             bulletSpeed:17, barrelLen:24, barrelW:1.8, useAmmoType:false, turretSpeed:0.032, label:'Cañón Oerlikon 20 mm' },
+  flak43:          { mag:3,  reloadSec:5.0, dmg:28,             bulletSpeed:16, barrelLen:30, barrelW:2.4, useAmmoType:false, turretSpeed:0.021, label:'Flak 43 de 3,7 cm' },
+  flak30_38:       { mag:6,  reloadSec:3.2, dmg:14,             bulletSpeed:15, barrelLen:22, barrelW:1.9, useAmmoType:false, turretSpeed:0.030, label:'Flak 30/38 de 2 cm' },
+};
+
+// Piezas de otros tanques que se pueden comprar para mejorar el propio
+const PARTS_POOL = [
+  // --- Chasis / Blindaje ---
+  { id:'panzer3_chasis_std',    name:'Chasis del Panzer III',            stat:'armor',  amount:20, visualId:'panzer3',        tank:'Panzer III "333"',                        desc:'Casco de acero laminado estándar de la Wehrmacht. +20 HP máx.' },
+  { id:'panzer3_chasis_afrika', name:'Chasis blindado del Panzer III',   stat:'armor',  amount:25, visualId:'panzer3_afrika', tank:'Panzer III Ausf. L "625" (Afrika Korps)',   desc:'Placas adicionales (Vorpanzer) usadas en el norte de África para reforzar el glacis y los laterales. +25 HP máx.' },
+  { id:'tp7_chasis',            name:'Chasis remachado del 7TP',         stat:'armor',  amount:15, visualId:'tp7',             tank:'7TP (Polonia)',                             desc:'Casco remachado sobre el diseño Vickers de 6 toneladas. Blindaje ligero. +15 HP máx.' },
+  { id:'pz35t_chasis',          name:'Chasis remachado del Panzer 35(t)',stat:'armor',  amount:22, visualId:'pz35t',          tank:'Panzer 35(t) "131"',                        desc:'Construcción checa remachada, sólida para su clase. +22 HP máx.' },
+  { id:'t26_finland_chasis',    name:'Chasis reforzado del T-26',        stat:'armor',  amount:28, visualId:'t26_finland',    tank:'T-26 mod. 1933 (capturado, Finlandia)',     desc:'Blindaje adicional aplicado en campaña finlandesa (tipo "T-26E"). +28 HP máx.' },
+  { id:'t26_command_chasis',    name:'Chasis del T-26 de mando',         stat:'armor',  amount:18, visualId:'t26_command',    tank:'T-26 mod. 1933 "de mando" (URSS)',          desc:'Casco remachado estándar soviético. +18 HP máx.' },
+  { id:'bt5_chasis',            name:'Chasis ligero del BT-5',           stat:'armor',  amount:15, visualId:'bt5',            tank:'BT-5 (URSS)',                               desc:'Blindaje fino (6-13 mm): prioriza velocidad sobre protección. +15 HP máx.' },
+  { id:'m3stuart_chasis',       name:'Chasis remachado del M3 Stuart',   stat:'armor',  amount:20, visualId:'m3stuart',       tank:'M3 Stuart "USMC 125"',                      desc:'Construcción remachada estadounidense, resistente para un tanque ligero. +20 HP máx.' },
+
+  // --- Cañón ---
+  { id:'panzer3_gun',        name:'Cañón KwK38 del Panzer III',        stat:'damage', gunType:'panzerIII',       visualId:'panzer3',        tank:'Panzer III "333"',                      desc:'Reemplaza tu cañón. 1 sola ronda en la recámara, recarga en 3.6s tras cada disparo — liviano y ágil, con daño moderado.' },
+  { id:'panzer3_gun_afrika', name:'Cañón KwK38 L/60 del Panzer III',   stat:'damage', gunType:'panzerIIIAfrika', visualId:'panzer3_afrika', tank:'Panzer III Ausf. L "625" (Afrika Korps)', desc:'Reemplaza tu cañón. Variante de cañón largo usada en el norte de África. 1 ronda, recarga en 3.6s, algo más de daño.' },
+  { id:'tp7_gun',            name:'Cañón Bofors wz.37 del 7TP',        stat:'damage', gunType:'bofors37',        visualId:'tp7',            tank:'7TP (Polonia)',                          desc:'Reemplaza tu cañón. 1 ronda, recarga rapidísima de 2.7s, pero proyectil de menor daño.' },
+  { id:'pz35t_gun',          name:'Cañón Škoda del Panzer 35(t)',      stat:'damage', gunType:'panzer35t',       visualId:'pz35t',          tank:'Panzer 35(t) "131"',                    desc:'Reemplaza tu cañón. 1 ronda, recarga en 4.1s, daño y velocidad intermedios.' },
+  { id:'bofors40_gun',       name:'Cañón Bofors 40 mm',                stat:'damage', gunType:'bofors40',                                   tank:'Bofors L60 (Suecia)',                   desc:'Reemplaza tu cañón. Cargador de 4 rondas automáticas, recarga en 5.5s. Buen alcance y daño equilibrado.' },
+  { id:'oerlikon20_gun',     name:'Cañón Oerlikon 20 mm',              stat:'damage', gunType:'oerlikon20',                                 tank:'Oerlikon (Suiza)',                      desc:'Reemplaza tu cañón. Cargador de 7 rondas, recarga rapidísima de 3s, pero cada proyectil hace poco daño.' },
+  { id:'flak43_gun',         name:'Flak 43 de 3,7 cm',                 stat:'damage', gunType:'flak43',                                     tank:'Flak 43 (Alemania)',                    desc:'Reemplaza tu cañón. Cargador de 3 rondas, recarga en 5s. El más dañino de los cañones automáticos.' },
+  { id:'flak3038_gun',       name:'Flak 30/38 de 2 cm',                stat:'damage', gunType:'flak30_38',                                  tank:'Flak 30/38 (Alemania)',                 desc:'Reemplaza tu cañón. Cargador de 6 rondas, recarga en 3.2s, disparo rápido pero de bajo daño.' },
+
+  // --- Orugas ---
+  { id:'panzer3_track_std',    name:'Orugas del Panzer III',            stat:'speed', amount:0.30, visualId:'panzer3',        tank:'Panzer III "333"',                        desc:'Tren de rodaje estándar de fábrica. +0.30 velocidad.' },
+  { id:'panzer3_track_afrika', name:'Orugas anchas del Panzer III',     stat:'speed', amount:0.25, visualId:'panzer3_afrika', tank:'Panzer III Ausf. L "625" (Afrika Korps)',   desc:'Orugas ensanchadas para terreno arenoso. +0.25 velocidad.' },
+  { id:'siedmiotp_track',      name:'Tren de rodaje del 7TP',           stat:'speed', amount:0.35, visualId:'tp7',             tank:'7TP (Polonia)',                             desc:'Basado en el chasis Vickers de 6 toneladas, liviano y ágil. +0.35 velocidad.' },
+  { id:'pz35t_track',          name:'Orugas del Panzer 35(t)',          stat:'speed', amount:0.30, visualId:'pz35t',          tank:'Panzer 35(t) "131"',                        desc:'Tren de rodaje checo, veloz aunque algo delicado. +0.30 velocidad.' },
+  { id:'t26_finland_track',    name:'Orugas del T-26 (Finlandia)',      stat:'speed', amount:0.25, visualId:'t26_finland',    tank:'T-26 mod. 1933 (capturado, Finlandia)',     desc:'Tren de rodaje reforzado para terreno nevado. +0.25 velocidad.' },
+  { id:'t26_command_track',    name:'Orugas del T-26 de mando',         stat:'speed', amount:0.25, visualId:'t26_command',    tank:'T-26 mod. 1933 "de mando" (URSS)',          desc:'Basado en el Vickers de 6 toneladas. +0.25 velocidad.' },
+  { id:'bt5_track',            name:'Tren de rodaje del BT-5',          stat:'speed', amount:0.40, visualId:'bt5',            tank:'BT-5 (URSS)',                               desc:'Suspensión Christie de altísima velocidad ("Bystrokhodny Tank"). +0.40 velocidad, la mayor del garage.' },
+  { id:'m3stuart_track',       name:'Orugas del M3 Stuart',             stat:'speed', amount:0.32, visualId:'m3stuart',       tank:'M3 Stuart "USMC 125"',                      desc:'Suspensión de resortes verticales, ágil y confiable (apodado "Honey"). +0.32 velocidad.' },
+
+  // --- Torreta ---
+  { id:'panzer3_turret_std',    name:'Torreta del Panzer III',           stat:'reload', amount:3, visualId:'panzer3',        tank:'Panzer III "333"',                        desc:'Torreta de 3 hombres con buena ergonomía de tripulación. Recarga más rápida.' },
+  { id:'panzer3_turret_afrika', name:'Torreta ampliada del Panzer III',  stat:'reload', amount:3, visualId:'panzer3_afrika', tank:'Panzer III Ausf. L "625" (Afrika Korps)',   desc:'Anillo de torreta ampliado con mejor visibilidad. Recarga más rápida.' },
+  { id:'tp7_turret',            name:'Torreta del 7TP',                  stat:'reload', amount:2, visualId:'tp7',             tank:'7TP (Polonia)',                             desc:'Torreta sencilla armada con cañón Bofors. Recarga algo más rápida.' },
+  { id:'pz35t_turret',          name:'Torreta del Panzer 35(t)',         stat:'reload', amount:4, visualId:'pz35t',          tank:'Panzer 35(t) "131"',                        desc:'Torreta con servoasistencia neumática para el giro y la puntería. Recarga notablemente más rápida.' },
+  { id:'t26_finland_turret',    name:'Torreta cilíndrica del T-26',      stat:'reload', amount:3, visualId:'t26_finland',    tank:'T-26 mod. 1933 (capturado, Finlandia)',     desc:'Torreta remachada de un solo hombre. Recarga más rápida.' },
+  { id:'t26_command_turret',    name:'Torreta de mando del T-26',        stat:'reload', amount:4, visualId:'t26_command',    tank:'T-26 mod. 1933 "de mando" (URSS)',          desc:'Torreta con radio para mejor coordinación de la tripulación. Recarga más rápida.' },
+  { id:'bt5_turret',            name:'Torreta del BT-5',                 stat:'reload', amount:3, visualId:'bt5',            tank:'BT-5 (URSS)',                               desc:'Torreta con doble escotilla y mejor visión para el artillero. Recarga más rápida.' },
+  { id:'m3stuart_turret',       name:'Torreta con cúpula AA del M3 Stuart', stat:'reload', amount:3, visualId:'m3stuart',   tank:'M3 Stuart "USMC 125"',                      desc:'Torreta con montura antiaérea para la ametralladora del comandante. Recarga más rápida.' },
+];
+
+const CATEGORY_META = {
+  armor:  { label:'Chasis / Blindaje', part:'Chasis' },
+  damage: { label:'Cañón',             part:'Cañón' },
+  speed:  { label:'Orugas',            part:'Orugas' },
+  reload: { label:'Torreta',           part:'Torreta' },
+};
+
+let player, enemies, infantry, atguns, bullets, particles, flag, worldWidth, camX, ruins;
+let terrainSeed = {};
+let running = false;
+let tutorialMode = false;
+let tutorialFinished = (()=>{ try{return localStorage.getItem('tankCommanderTutorialComplete')==='1';}catch(e){return false;} })();
+let tutorialShot = false;
+let artilleryAvailable = true;
+let artilleryMode = false;
+let artilleryTargetX = null;
+let artilleryImpact = null;
+let artilleryShells = [];
+let artilleryDebris = [];
+const ARTILLERY_RADIUS = 145;
+
+const GRAVITY = 0.14;
+const GROUND_MARGIN = 340;
+
+// Geometría compartida del casco (dos rectángulos escalonados) y la torreta
+const WHEEL_Y = -8;
+const TRACK_TOP = WHEEL_Y - 3;
+const TRACK_BOTTOM = WHEEL_Y + 10;
+const TRACK_MID = (TRACK_TOP + TRACK_BOTTOM) / 2;
+const LOWER_RECT_W = 76, LOWER_RECT_H = 17;
+const UPPER_RECT_W = 48, UPPER_RECT_H = 12;
+const LOWER_TOP = TRACK_MID - LOWER_RECT_H;
+const HULL_TOP_Y = LOWER_TOP - UPPER_RECT_H;
+const TURRET_PIVOT_Y = HULL_TOP_Y + 2;
+
+// ---------- Terrain ----------
+function genTerrain(){
+  terrainSeed = {
+    a1: 18 + Math.random()*10, f1: 0.0035 + Math.random()*0.002, p1: Math.random()*10,
+    a2: 8 + Math.random()*6,  f2: 0.011 + Math.random()*0.004,  p2: Math.random()*10,
+    a3: 4 + Math.random()*3,  f3: 0.03,                          p3: Math.random()*10,
+  };
+}
+function terrainY(x){
+  const t = terrainSeed;
+  return GROUND_MARGIN
+    + Math.sin(x*t.f1 + t.p1)*t.a1
+    + Math.sin(x*t.f2 + t.p2)*t.a2
+    + Math.sin(x*t.f3 + t.p3)*t.a3;
+}
+function terrainAngle(x){
+  const d = 4;
+  const y1 = terrainY(x-d), y2 = terrainY(x+d);
+  return Math.atan2(y2-y1, d*2);
+}
+
+// ---------- Entities ----------
+function makePlayer(){
+  const gs = GUN_STATS[equippedGun];
+  const startingReserve = ammoReserve;
+  ammoReserve = 0;
+  return {
+    x: 120, facing:1,
+    turretAngle: 0.35,
+    hp: 100 + upgrades.armor*25,
+    maxHp: 100 + upgrades.armor*25,
+    speed: 1.3 + upgrades.speed*0.3,
+    reload:0,
+    reloadMax: Math.max(12, 24 - upgrades.reload*3),
+    ammo:'AP',
+    gunType: equippedGun,
+    rounds: gs.mag + startingReserve,
+    magReloading: false,
+    magReloadTimer: 0
+  };
+}
+
+function tankColor(kind){
+  if(kind==='player') return { base:'#66703f', campA:'#5c4530', campB:'#c9b988', camo:true, wheelCount:5, wheelR:7.2 };
+  if(kind==='heavy')  return { base:'#3d4a2a', camo:false, wheelCount:6, wheelR:5.6 };
+  if(kind==='fast')   return { base:'#57633c', camo:false, wheelCount:6, wheelR:5.4 };
+  return { base:'#4f5c37', camo:false, wheelCount:6, wheelR:5.6 };
+}
+
+// Resuelve el estilo visual (color, remaches, ruedas) de una categoría según la pieza comprada,
+// o el aspecto original de fábrica si todavía no se compró ninguna pieza para esa parte.
+function getVisualStyle(cat){
+  const id = equippedVisual[cat];
+  if(id && TANK_VISUALS[id]) return TANK_VISUALS[id];
+  return { ...tankColor('player'), key:'default', rivets:false, schurzen:false };
+}
+
+function spawnEnemies(n){
+  const arr=[];
+  const spacing = Math.max(280, worldWidth / (n+1));
+  for(let i=1;i<=n;i++){
+    const roll = Math.random();
+    const kind = roll<0.55?'normal':roll<0.8?'fast':'heavy';
+    const baseHp = kind==='heavy'?150:kind==='fast'?55:85;
+    const scale = 1 + (level-1)*0.06;
+    // Separación amplia y variación moderada: evita que la línea enemiga nazca amontonada.
+    const x = Math.min(worldWidth-180, 260 + spacing*(i-1) + (Math.random()-0.5)*55);
+    arr.push({
+      x, kind,
+      hp: baseHp*scale, maxHp: baseHp*scale,
+      dmg: kind==='heavy'?14:kind==='fast'?6:9,
+      turretAngle:0.2,
+      reload: 45 + Math.random()*100,
+      reloadMax: kind==='heavy'?165:kind==='fast'?135:150,
+      range: 900,
+      speed: (kind==='heavy'?0.45:kind==='fast'?1.2:0.8) * (0.85+Math.random()*0.3),
+      preferredDist: 300 + i*105 + Math.random()*55,
+      facing: 1,
+      turretNumber: String(1+Math.floor(Math.random()*9)),
+      dead:false
+    });
+  }
+  return arr;
+}
+
+function spawnInfantry(groupCount, enemyList){
+  const arr=[];
+  const spacing = worldWidth/(groupCount+1);
+  const REG_RELOAD = 95;
+  for(let g=1; g<=groupCount; g++){
+    let centerX;
+    if(enemyList && enemyList.length){
+      // se ubica justo detrás de un tanque (más lejos del punto de inicio del jugador), usándolo como escudo
+      const shieldTank = enemyList[Math.floor(Math.random()*enemyList.length)];
+      centerX = Math.min(worldWidth-60, shieldTank.x + 60 + Math.random()*25);
+    } else {
+      centerX = spacing*g + (Math.random()-0.5)*80;
+    }
+    for(let i=0; i<6; i++){
+      const isPanzerfaust = (i===0);
+      const offset = (i-2.5)*13;
+      arr.push({
+        x: centerX + offset,
+        hp: isPanzerfaust ? 22 : 18,
+        maxHp: isPanzerfaust ? 22 : 18,
+        dmg: isPanzerfaust ? 26 : 3, // daño reducido; el Panzerfaust sigue siendo una amenaza puntual
+        reload: 55 + Math.random() * (isPanzerfaust ? REG_RELOAD*1.25 : REG_RELOAD),
+        reloadMax: isPanzerfaust ? REG_RELOAD*1.35 : REG_RELOAD,
+        range: isPanzerfaust ? 260 : 320,
+        dead:false, kind: isPanzerfaust ? 'panzerfaust' : 'infantry'
+      });
+    }
+  }
+  return arr;
+}
+
+function spawnATGuns(n){
+  const arr=[];
+  const spacing = worldWidth/(n+1);
+  const scale = 1 + (level-1)*0.06;
+  for(let i=1;i<=n;i++){
+    const x = spacing*i + (Math.random()-0.5)*90;
+    arr.push({
+      x, hp:70*scale, maxHp:70*scale,
+      dmg:14,
+      turretAngle:0.15,
+      reload: 80 + Math.random()*100, reloadMax:170,
+      range:480, dead:false, kind:'atgun'
+    });
+  }
+  return arr;
+}
+
+function initLevel(){
+  campaign = Math.ceil(level/5);
+  subLevel = ((level-1)%5)+1;
+  genTerrain();
+  worldWidth = 2200 + campaign*250 + subLevel*150;
+  player = makePlayer();
+  enemies = spawnEnemies(5);
+  infantry = level>=3 ? spawnInfantry(Math.min(1 + Math.floor((level-3)/6), 3), enemies) : [];
+  atguns = level>=9 ? spawnATGuns(Math.min(1 + Math.floor((level-9)/6), 3)) : [];
+  artilleryAvailable = true;
+  artilleryMode = false;
+  artilleryTargetX = null;
+  artilleryShells = [];
+  artilleryDebris = [];
+  artilleryImpact = null;
+  ruins = [];
+  const ruinCount = 5 + Math.floor(Math.random()*4);
+  for(let i=0; i<ruinCount; i++){
+    ruins.push({
+      worldX: Math.random()*worldWidth*1.3,
+      type: Math.floor(Math.random()*4),
+      scale: 0.75 + Math.random()*0.75
+    });
+  }
+  bullets = [];
+  particles = [];
+  flag = { x: worldWidth - 80 };
+  camX = 0;
+  lvlNumEl.textContent = campaign+'-'+subLevel;
+  updateHUD();
+}
+
+function updateHUD(){
+  hpfill.style.width = Math.max(0,(player.hp/player.maxHp*100)) + '%';
+  hpfill.style.background = player.hp/player.maxHp < 0.3 ? 'var(--hp-low)' : 'var(--hp)';
+  const alive = enemies.filter(e=>!e.dead).length + infantry.filter(i=>!i.dead).length + atguns.filter(a=>!a.dead).length;
+  enemyCountEl.textContent = alive;
+  creditsEl.textContent = credits;
+  if(menuAmmoCoinsEl) menuAmmoCoinsEl.textContent=ammoCoins;
+  if(menuPartsCoinsEl) menuPartsCoinsEl.textContent=partsCoins;
+
+  const gs = GUN_STATS[player.gunType];
+  gunLabelEl.style.display = gs.useAmmoType ? '' : 'none';
+  ammoAPEl.classList.toggle('active', player.ammo==='AP');
+  ammoHEEl.classList.toggle('active', player.ammo==='HE');
+  roundsLeftEl.textContent = player.rounds;
+  roundsMaxEl.textContent = gs.mag;
+  if(player.magReloading){
+    reloadStatusEl.classList.remove('hidden');
+    reloadSecsEl.textContent = Math.ceil(player.magReloadTimer/60);
+  } else {
+    reloadStatusEl.classList.add('hidden');
+  }
+  progressfill.style.width = Math.min(100, (player.x/worldWidth*100)) + '%';
+  if(artilleryStatusEl){
+    artilleryStatusEl.textContent = artilleryMode ? 'SELECCIONA OBJETIVO' : (artilleryAvailable ? 'LISTA [Q]' : 'USADA');
+    artilleryStatusEl.style.color = artilleryMode ? '#ffe6a0' : (artilleryAvailable ? '#9fdf77' : '#888');
+  }
+  if(artilleryBtnEl){
+    artilleryBtnEl.classList.toggle('ready', artilleryAvailable && !artilleryMode);
+    artilleryBtnEl.classList.toggle('active', artilleryMode);
+  }
+}
+
+function startTutorialMission(){
+  tutorialMode = true;
+  tutorialShot = false;
+  level = 1;
+  hideScreen();
+  initLevel();
+  worldWidth = 1650;
+  flag = {x:1480};
+  enemies = spawnEnemies(3);
+  enemies.forEach((en,i)=>{ en.x=500+i*260; en.dmg=0; en.reload=999999; en.reloadMax=999999; en.preferredDist=9999; });
+  infantry=[]; atguns=[];
+  lvlNumEl.textContent='TUTORIAL';
+  running=true;
+  loop();
+}
+
+// ---------- Input ----------
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if(k==='q') { e.preventDefault(); toggleArtillery(); return; }
+  keys[k]=true;
+  if(k===' ') e.preventDefault();
+  if(k==='1' && player) player.ammo='AP';
+  if(k==='2' && player) player.ammo='HE';
+});
+window.addEventListener('keyup', e=> keys[e.key.toLowerCase()]=false);
+canvas.addEventListener('mousedown', e=>{
+  if(artilleryMode){ selectArtilleryTarget(e.clientX,e.clientY); return; }
+  mouseDown=true;
+});
+canvas.addEventListener('touchstart', e=>{
+  if(artilleryMode && e.touches[0]){
+    e.preventDefault();
+    selectArtilleryTarget(e.touches[0].clientX,e.touches[0].clientY);
+  }
+},{passive:false});
+window.addEventListener('mouseup', ()=> mouseDown=false);
+
+// ---------- Controles táctiles ----------
+function bindHoldButton(id, onPress, onRelease){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const press = e=>{ e.preventDefault(); e.stopPropagation(); el.classList.add('pressed'); onPress(); };
+  const release = e=>{ if(e) e.preventDefault(); el.classList.remove('pressed'); onRelease(); };
+  el.addEventListener('touchstart', press, {passive:false});
+  el.addEventListener('touchend', release, {passive:false});
+  el.addEventListener('touchcancel', release, {passive:false});
+}
+bindHoldButton('btnLeft',       ()=>keys['a']=true,     ()=>keys['a']=false);
+bindHoldButton('btnRight',      ()=>keys['d']=true,     ()=>keys['d']=false);
+bindHoldButton('btnTurretUp',   ()=>keys['w']=true,     ()=>keys['w']=false);
+bindHoldButton('btnTurretDown', ()=>keys['s']=true,     ()=>keys['s']=false);
+bindHoldButton('btnFire',       ()=>keys[' ']=true,     ()=>keys[' ']=false);
+
+// En PC se juega con teclado/mouse y los botones táctiles no ocupan espacio.
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+const touchControlsEl = document.getElementById('touchControls');
+if(touchControlsEl && !isTouchDevice) touchControlsEl.style.display = 'none';
+
+function bindTapButton(id, onTap){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const tap = e=>{ e.preventDefault(); e.stopPropagation(); onTap(); };
+  el.addEventListener('touchstart', tap, {passive:false});
+  el.addEventListener('click', tap);
+}
+bindTapButton('ammoAP', ()=>{ if(player) player.ammo='AP'; });
+bindTapButton('ammoHE', ()=>{ if(player) player.ammo='HE'; });
+bindTapButton('btnArtillery', toggleArtillery);
+
+function toggleArtillery(){
+  if(!running || !artilleryAvailable || !player) return;
+  artilleryMode = !artilleryMode;
+  if(artilleryMode){
+    // Preselecciona una zona delante del carro; el jugador puede moverla con un clic/toque.
+    artilleryTargetX = Math.max(ARTILLERY_RADIUS, Math.min(worldWidth-ARTILLERY_RADIUS, player.x+430));
+    mouseDown = false;
+    toast('TIEMPO DETENIDO · TOCA O HAZ CLIC PARA FIJAR EL BLANCO', 2200);
+  } else {
+    artilleryTargetX = null;
+  }
+  updateHUD();
+}
+
+function selectArtilleryTarget(clientX, clientY){
+  if(!artilleryMode || !artilleryAvailable) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = (clientX-rect.left) / rect.width * W;
+  artilleryTargetX = Math.max(ARTILLERY_RADIUS, Math.min(worldWidth-ARTILLERY_RADIUS, sx+camX));
+  callArtillery(artilleryTargetX);
+}
+
+function callArtillery(x){
+  if(!artilleryMode || !artilleryAvailable) return;
+  artilleryMode = false;
+  artilleryAvailable = false;
+  if(tutorialMode) tutorialShot = true;
+  artilleryTargetX = null;
+  // Tres proyectiles grandes llegan desde el cielo con una ligera dispersión.
+  [-58,0,54].forEach((offset,i)=>{
+    const target = x + offset;
+    artilleryShells.push({x:target + (i-1)*70, y:-85-i*38, vx:(target-(target+(i-1)*70))*0.018, vy:1.5+i*.12, target, dead:false});
+  });
+  toast('¡SALVA DE ARTILLERÍA EN CAMINO!', 1400);
+  updateHUD();
+}
+
+function artilleryBlast(x){
+  const y = terrainY(x)-10;
+  const areaDamage = 58;
+  artilleryImpact = {x, life:58};
+  spawnParticles(x,y,'#ff9d3a',30);
+  spawnParticles(x,y,'#e8d28a',20);
+  enemies.forEach(en=>{
+    if(!en.dead){ const d=Math.hypot(x-en.x, terrainY(en.x)-y); if(d<=ARTILLERY_RADIUS) en.hp-=areaDamage*(d<72?1:.62); }
+  });
+  infantry.forEach(inf=>{ if(!inf.dead && Math.abs(x-inf.x)<=ARTILLERY_RADIUS) inf.hp-=areaDamage*1.35; });
+  atguns.forEach(atg=>{ if(!atg.dead && Math.abs(x-atg.x)<=ARTILLERY_RADIUS) atg.hp-=areaDamage*1.2; });
+  // Restos que suben y bajan siguiendo una parábola convexa.
+  for(let i=0;i<28;i++){
+    const angle=(i/28)*Math.PI*2;
+    const speed=2.2+Math.random()*4.8;
+    artilleryDebris.push({x,y:y-6,vx:Math.cos(angle)*speed,vy:- (3.5+Math.random()*5.2),gravity:.18+Math.random()*.08,life:75+Math.random()*30,size:1.5+Math.random()*3.5,color:i%3===0?'#171610':i%2?'#6f6247':'#a38b5b'});
+  }
+}
+
+function updateArtilleryEffects(){
+  artilleryShells.forEach(shell=>{
+    if(shell.dead) return;
+    shell.vy += .16;
+    shell.x += shell.vx;
+    shell.y += shell.vy;
+    if(shell.y >= terrainY(shell.x)-10){
+      shell.dead=true;
+      artilleryBlast(shell.target);
+    }
+  });
+  artilleryShells=artilleryShells.filter(shell=>!shell.dead);
+  artilleryDebris.forEach(bit=>{
+    bit.x+=bit.vx; bit.y+=bit.vy; bit.vy+=bit.gravity; bit.life--;
+    if(bit.y>=terrainY(bit.x)-2){ bit.y=terrainY(bit.x)-2; bit.vy=0; bit.vx*=.72; bit.life=Math.min(bit.life,8); }
+  });
+  artilleryDebris=artilleryDebris.filter(bit=>bit.life>0 && bit.y< H+30);
+}
+
+// ---------- Drawing helpers ----------
+function shadeColor(hex, pct){
+  const num = parseInt(hex.slice(1),16);
+  let r=(num>>16)+pct, g=((num>>8)&0xff)+pct, b=(num&0xff)+pct;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return `rgb(${r},${g},${b})`;
+}
+
+function worldToScreenX(x){ return x - camX; }
+
+function drawClouds(){
+  const drift = (camX*0.12 + subLevel*42) % (W+260);
+  ctx.save();
+  ctx.fillStyle = campaign===2 ? 'rgba(255,255,255,.42)' : 'rgba(245,238,215,.18)';
+  for(let i=-1;i<5;i++){
+    const x = i*190 - drift, y = 48 + ((i*37 + campaign*19)%75);
+    ctx.beginPath();
+    ctx.ellipse(x,y,48,10,0,0,Math.PI*2);
+    ctx.ellipse(x+30,y-6,30,14,0,0,Math.PI*2);
+    ctx.ellipse(x-30,y-3,25,11,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCampaignBackdrop(){
+  const parallax = camX*0.28;
+  const base = GROUND_MARGIN - 30;
+  ctx.save();
+  ctx.translate(-parallax,0);
+  const start = Math.floor(parallax/90)*90 - 180;
+  for(let x=start;x<W+parallax+240;x+=90){
+    const y = base + Math.sin(x*0.013 + campaign)*9;
+    if(campaign===1 || campaign===4){
+      ctx.fillStyle = campaign===1 ? 'rgba(24,53,31,.72)' : 'rgba(48,55,34,.64)';
+      ctx.beginPath(); ctx.moveTo(x,y+12); ctx.lineTo(x+18,y-34); ctx.lineTo(x+37,y+12); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(17,31,22,.8)'; ctx.fillRect(x+21,y-2,3,36);
+      if((x/90+subLevel)%3===0){ctx.strokeStyle='rgba(30,30,24,.55)';ctx.beginPath();ctx.moveTo(x+22,y-1);ctx.lineTo(x+110,y+5);ctx.stroke();}
+    } else if(campaign===2){
+      ctx.fillStyle='rgba(73,91,98,.55)';
+      ctx.beginPath();ctx.moveTo(x,y+12);ctx.lineTo(x+20,y-43);ctx.lineTo(x+42,y+12);ctx.closePath();ctx.fill();
+      ctx.fillStyle='rgba(245,248,246,.7)';ctx.beginPath();ctx.moveTo(x+20,y-43);ctx.lineTo(x+30,y-17);ctx.lineTo(x+10,y-17);ctx.closePath();ctx.fill();
+      if((x/90+subLevel)%4===0){ctx.fillStyle='rgba(65,65,61,.22)';ctx.beginPath();ctx.arc(x+58,y-46,13,0,Math.PI*2);ctx.arc(x+70,y-62,18,0,Math.PI*2);ctx.fill();}
+    } else if(campaign===3){
+      ctx.fillStyle='rgba(177,132,64,.32)';ctx.beginPath();ctx.ellipse(x+32,y+8,74,18,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(74,53,28,.7)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x+25,y+9);ctx.lineTo(x+20,y-43);ctx.stroke();
+      ctx.fillStyle='rgba(38,72,42,.72)';ctx.beginPath();ctx.arc(x+12,y-46,13,0,Math.PI*2);ctx.arc(x+31,y-49,14,0,Math.PI*2);ctx.arc(x+42,y-42,12,0,Math.PI*2);ctx.fill();ctx.lineWidth=1;
+    } else {
+      ctx.fillStyle='rgba(24,78,67,.62)';ctx.beginPath();ctx.ellipse(x+25,y-10,28,45,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(70,48,29,.7)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x+25,y+18);ctx.lineTo(x+31,y-33);ctx.stroke();
+      ctx.strokeStyle='rgba(21,54,45,.8)';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+31,y-33);ctx.lineTo(x+5,y-46);ctx.moveTo(x+31,y-33);ctx.lineTo(x+58,y-48);ctx.stroke();ctx.lineWidth=1;
+      ctx.fillStyle='rgba(53,51,39,.72)';ctx.fillRect(x+55,y-7,30,16);
+    }
+  }
+  ctx.restore();
+}
+
+function drawSky(){
+  const pal = CAMPAIGN_PALETTES[campaign];
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, pal.skyTop);
+  grad.addColorStop(1, pal.skyBottom);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = pal.hill;
+  ctx.beginPath();
+  ctx.moveTo(0,H);
+  for(let sx=0; sx<=W; sx+=20){
+    const wx = sx + camX*0.4;
+    const hy = GROUND_MARGIN - 40 + Math.sin(wx*0.002 + subLevel)*26;
+    ctx.lineTo(sx, hy);
+  }
+  ctx.lineTo(W,H);
+  ctx.closePath();
+  ctx.fill();
+
+  drawClouds();
+  drawCampaignBackdrop();
+
+  // ligera variación de iluminación entre los subniveles de una misma campaña
+  if(subLevel>1){
+    ctx.fillStyle = `rgba(0,0,0,${(subLevel-1)*0.035})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  drawRuins(pal);
+}
+
+// Estructuras destruidas (edificios bombardeados, escombros) en el fondo, para ambientar la escena
+function drawRuins(pal){
+  ruins.forEach(r=>{
+    const sx = r.worldX - camX*0.4;
+    if(sx < -120 || sx > W+120) return;
+    const baseY = GROUND_MARGIN - 40 + Math.sin(r.worldX*0.002 + subLevel)*26;
+    ctx.save();
+    ctx.translate(sx, baseY);
+    ctx.scale(r.scale, r.scale);
+    ctx.fillStyle = 'rgba(28,24,19,0.62)';
+    ctx.strokeStyle = 'rgba(28,24,19,0.62)';
+    ctx.lineWidth = 1.2;
+    if(r.type===0){
+      // esqueleto de edificio bombardeado
+      ctx.beginPath();
+      ctx.moveTo(-22,10); ctx.lineTo(-22,-18); ctx.lineTo(-14,-26); ctx.lineTo(-6,-16);
+      ctx.lineTo(4,-30); ctx.lineTo(12,-14); ctx.lineTo(22,-20); ctx.lineTo(22,10);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = pal.skyBottom;
+      ctx.fillRect(-17,-6,5,8);
+      ctx.fillRect(-5,-10,5,8);
+      ctx.fillRect(7,-4,5,8);
+      ctx.beginPath();
+      ctx.moveTo(-14,-26); ctx.lineTo(-15,-35);
+      ctx.moveTo(4,-30); ctx.lineTo(3,-41);
+      ctx.stroke();
+    } else if(r.type===1){
+      // montículo de escombros
+      ctx.beginPath();
+      ctx.moveTo(-20,10);
+      ctx.quadraticCurveTo(-10,-9,0,-6);
+      ctx.quadraticCurveTo(10,-14,20,9);
+      ctx.lineTo(20,12); ctx.lineTo(-20,12);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-4,-8); ctx.lineTo(-6,-21);
+      ctx.moveTo(6,-10); ctx.lineTo(9,-23);
+      ctx.stroke();
+    } else if(r.type===2){
+      // búnker o puesto de observación abandonado
+      ctx.fillStyle='rgba(35,35,29,.74)';
+      ctx.fillRect(-25,-12,50,24);
+      ctx.fillStyle=pal.skyBottom;
+      ctx.fillRect(-15,-5,11,6); ctx.fillRect(7,-5,11,6);
+      ctx.strokeStyle='rgba(18,18,14,.8)'; ctx.beginPath();ctx.moveTo(-25,-12);ctx.lineTo(-14,-22);ctx.lineTo(25,-12);ctx.stroke();
+      ctx.fillStyle='rgba(0,0,0,.8)';ctx.fillRect(-7,-1,14,13);
+    } else {
+      // carcasa de vehículo o tanque abandonado
+      ctx.fillStyle='rgba(39,38,28,.76)';
+      ctx.beginPath();ctx.moveTo(-27,10);ctx.lineTo(-21,-8);ctx.lineTo(13,-11);ctx.lineTo(27,2);ctx.lineTo(22,12);ctx.closePath();ctx.fill();
+      ctx.fillStyle='rgba(25,25,19,.85)';ctx.beginPath();ctx.arc(-15,11,7,0,Math.PI*2);ctx.arc(16,11,7,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(15,15,12,.75)';ctx.beginPath();ctx.moveTo(4,-8);ctx.lineTo(31,-27);ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+function drawTerrain(){
+  const pal = CAMPAIGN_PALETTES[campaign];
+  ctx.fillStyle = pal.ground;
+  ctx.beginPath();
+  ctx.moveTo(0,H);
+  for(let sx=0; sx<=W; sx+=8){
+    const wx = sx + camX;
+    ctx.lineTo(sx, terrainY(wx));
+  }
+  ctx.lineTo(W,H);
+  ctx.closePath();
+  ctx.fill();
+
+  // Texturas de suelo: barro, nieve, arena, estepa o costa según el frente.
+  const firstMark = Math.floor(camX/70)*70 - 140;
+  for(let wx=firstMark; wx<camX+W+180; wx+=70){
+    const sx=worldToScreenX(wx), gy=terrainY(wx);
+    const variant=(Math.floor(wx/70)+subLevel)%4;
+    ctx.save();
+    if(campaign===2){
+      ctx.strokeStyle='rgba(125,145,150,.34)';ctx.beginPath();ctx.moveTo(sx,gy+5);ctx.lineTo(sx+18,gy+7+variant);ctx.stroke();
+      if(variant===0){ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.arc(sx+26,gy+3,2,0,Math.PI*2);ctx.fill();}
+    } else if(campaign===3){
+      ctx.strokeStyle='rgba(112,78,35,.28)';ctx.beginPath();ctx.moveTo(sx,gy+4);ctx.quadraticCurveTo(sx+20,gy-1,sx+38,gy+5);ctx.stroke();
+      if(variant===1){ctx.fillStyle='rgba(66,53,32,.55)';ctx.fillRect(sx+18,gy-2,3,3);}
+    } else if(campaign===5){
+      ctx.strokeStyle='rgba(24,76,51,.42)';ctx.beginPath();ctx.moveTo(sx+8,gy+5);ctx.lineTo(sx+11,gy-4);ctx.moveTo(sx+11,gy-1);ctx.lineTo(sx+5,gy-6);ctx.moveTo(sx+11,gy-2);ctx.lineTo(sx+17,gy-7);ctx.stroke();
+    } else {
+      ctx.strokeStyle=campaign===4?'rgba(48,48,29,.34)':'rgba(20,42,20,.38)';ctx.beginPath();ctx.moveTo(sx,gy+5);ctx.lineTo(sx+5,gy-3);ctx.moveTo(sx+9,gy+5);ctx.lineTo(sx+14,gy-5);ctx.stroke();
+      if(variant===2){ctx.fillStyle='rgba(45,43,31,.5)';ctx.beginPath();ctx.ellipse(sx+31,gy+5,7,2,0,0,Math.PI*2);ctx.fill();}
+    }
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for(let sx=0; sx<=W; sx+=8){
+    const wx = sx+camX;
+    const y = terrainY(wx);
+    if(sx===0) ctx.moveTo(sx,y); else ctx.lineTo(sx,y);
+  }
+  ctx.stroke();
+  ctx.lineWidth=1;
+}
+
+function drawFlag(){
+  const sx = worldToScreenX(flag.x);
+  if(sx<-40 || sx>W+40) return;
+  const gy = terrainY(flag.x);
+  ctx.strokeStyle='#333'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(sx,gy); ctx.lineTo(sx,gy-70); ctx.stroke();
+  ctx.fillStyle = (enemies.every(e=>e.dead) && infantry.every(i=>i.dead) && atguns.every(a=>a.dead)) ? '#3fae3f' : '#c0392b';
+  ctx.beginPath();
+  ctx.moveTo(sx,gy-70); ctx.lineTo(sx+34,gy-58); ctx.lineTo(sx,gy-46);
+  ctx.closePath(); ctx.fill();
+  ctx.lineWidth=1;
+}
+
+function drawBlotch(g,x,y,rx,ry,rot){
+  g.beginPath();
+  g.ellipse(x,y,rx,ry,rot,0,Math.PI*2);
+  g.fill();
+  g.strokeStyle='rgba(15,15,10,0.45)';
+  g.lineWidth=1;
+  g.stroke();
+}
+
+// Rueda con radios visibles (estilo tanques ligeros como el Panzer 38(t) o el T-60/T-70)
+// Fila de remaches, para tanques de construcción remachada (7TP, Panzer 35(t))
+function drawRivets(g, x1, y1, x2, y2, count){
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  for(let i=0;i<count;i++){
+    const t = i/(count-1);
+    const rx = x1+(x2-x1)*t, ry = y1+(y2-y1)*t;
+    g.beginPath(); g.arc(rx, ry, 0.9, 0, Math.PI*2); g.fill();
+  }
+}
+
+function drawWheel(g,cx,cy,r){
+  g.fillStyle='#0c0c09';
+  g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fill();
+  g.fillStyle='#3a3a30';
+  g.beginPath(); g.arc(cx,cy,r*0.76,0,Math.PI*2); g.fill();
+  g.fillStyle='#0c0c09';
+  g.beginPath(); g.arc(cx,cy,r*0.6,0,Math.PI*2); g.fill();
+  g.strokeStyle='#3a3a30';
+  g.lineWidth = Math.max(1, r*0.16);
+  const spokes=5;
+  for(let i=0;i<spokes;i++){
+    const a = i*(Math.PI*2/spokes) + 0.3;
+    g.beginPath();
+    g.moveTo(cx+Math.cos(a)*r*0.22, cy+Math.sin(a)*r*0.22);
+    g.lineTo(cx+Math.cos(a)*r*0.7, cy+Math.sin(a)*r*0.7);
+    g.stroke();
+  }
+  g.lineWidth=1;
+  g.fillStyle='#1c1c16';
+  g.beginPath(); g.arc(cx,cy,r*0.24,0,Math.PI*2); g.fill();
+}
+
+// Dibuja un tanque realista (orugas con eslabones, varias ruedas, torreta con fusca y cúpula).
+// Coordenadas locales: origen (0,0) = punto de contacto con el suelo, centro del casco.
+function renderTank(g, o){
+  const hullW=58, hullH=26, wheelY=-8;
+  const facing = o.facing||1;
+  const hullColor = o.hullColor || o.color;
+  const trackColor = o.trackColor || o.color;
+  const turretColorSrc = o.turretColor || o.color;
+
+  g.save();
+  g.translate(o.x, o.y);
+  g.scale(o.scale||1, o.scale||1);
+  g.rotate(o.angle||0);
+
+  // líneas de movimiento (mejora de velocidad, solo garage)
+  if(o.motionLines){
+    g.strokeStyle='rgba(255,255,255,0.3)';
+    for(let i=0;i<o.motionLines;i++){
+      g.beginPath(); g.moveTo(-hullW/2-14-i*7, wheelY+4); g.lineTo(-hullW/2-26-i*7, wheelY+4); g.stroke();
+    }
+  }
+
+  // guardabarros
+  g.fillStyle = shadeColor(trackColor.base,-32);
+  g.fillRect(-hullW/2-9, wheelY-2, hullW+18, 3);
+
+  // oruga (banda)
+  g.fillStyle = '#17170f';
+  g.beginPath(); g.roundRect(-hullW/2-11, wheelY-3, hullW+22, 13, 6); g.fill();
+
+  // eslabones de la oruga
+  g.strokeStyle='rgba(0,0,0,0.55)';
+  for(let tx=-hullW/2-10; tx<=hullW/2+10; tx+=4.5){
+    g.beginPath(); g.moveTo(tx, wheelY-3); g.lineTo(tx, wheelY+9); g.stroke();
+  }
+
+  // ruedas de rodadura (con radios, cantidad y tamaño según el tanque de origen de las orugas)
+  const wheelR = trackColor.wheelR||5.5, count = trackColor.wheelCount||6;
+  const span=hullW-6, start=-hullW/2+3;
+  for(let i=0;i<count;i++){
+    const wx = start + (span/(count-1))*i;
+    drawWheel(g, wx, wheelY+4, wheelR);
+  }
+  // ruedas tensoras/motrices en los extremos
+  drawWheel(g, -hullW/2-7.5, wheelY+3, wheelR*1.08);
+  drawWheel(g, hullW/2+7.5, wheelY+3, wheelR*1.08);
+  // rodillos superiores de retorno
+  g.fillStyle='#1c1c16';
+  [-hullW/4,0,hullW/4].forEach(wx=>{
+    g.beginPath(); g.arc(wx, wheelY-5, 2.6, 0, Math.PI*2); g.fill();
+  });
+
+  // casco: rectángulo inferior (a nivel de las orugas, encastrando la mitad superior de las ruedas)
+  // + rectángulo superior más pequeño encima, simulando la cubierta del chasis
+  g.fillStyle = hullColor.base;
+  g.fillRect(-LOWER_RECT_W/2, LOWER_TOP, LOWER_RECT_W, LOWER_RECT_H);
+  g.strokeStyle='rgba(0,0,0,0.35)';
+  g.strokeRect(-LOWER_RECT_W/2, LOWER_TOP, LOWER_RECT_W, LOWER_RECT_H);
+  g.fillRect(-UPPER_RECT_W/2, HULL_TOP_Y, UPPER_RECT_W, UPPER_RECT_H);
+  g.strokeRect(-UPPER_RECT_W/2, HULL_TOP_Y, UPPER_RECT_W, UPPER_RECT_H);
+
+  // manchas de camuflaje bicolor con contorno (según el chasis equipado)
+  if(hullColor.camo){
+    g.globalAlpha=0.92;
+    g.fillStyle = hullColor.campA;
+    drawBlotch(g, -LOWER_RECT_W*0.26, LOWER_TOP+5, 11, 5.5, 0.3);
+    drawBlotch(g, UPPER_RECT_W*0.3, HULL_TOP_Y+4, 7, 4, 0.5);
+    g.fillStyle = hullColor.campB;
+    drawBlotch(g, LOWER_RECT_W*0.18, LOWER_TOP+11, 9, 5, -0.25);
+    drawBlotch(g, -UPPER_RECT_W*0.22, HULL_TOP_Y+5, 6, 3.5, 0.1);
+    g.globalAlpha=1;
+  }
+  // remaches (chasis de construcción remachada, ej. 7TP / Panzer 35(t))
+  if(hullColor.rivets){
+    g.fillStyle='rgba(0,0,0,0.4)';
+    for(let rx=-LOWER_RECT_W/2+6; rx<=LOWER_RECT_W/2-6; rx+=9){
+      g.beginPath(); g.arc(rx, LOWER_TOP+3, 1, 0, Math.PI*2); g.fill();
+      g.beginPath(); g.arc(rx, LOWER_TOP+LOWER_RECT_H-3, 1, 0, Math.PI*2); g.fill();
+    }
+  }
+  // faldones laterales (schürzen, Panzer III Afrika Korps)
+  if(hullColor.schurzen){
+    g.fillStyle = shadeColor(hullColor.base,-20);
+    g.globalAlpha=0.85;
+    g.fillRect(-LOWER_RECT_W/2-3, LOWER_TOP+2, LOWER_RECT_W+6, LOWER_RECT_H-4);
+    g.globalAlpha=1;
+    g.strokeStyle='rgba(0,0,0,0.3)';
+    g.strokeRect(-LOWER_RECT_W/2-3, LOWER_TOP+2, LOWER_RECT_W+6, LOWER_RECT_H-4);
+  }
+  // parche de blindaje extra (mejora del chasis, solo garage)
+  if(o.armorPlates){
+    g.strokeStyle='rgba(255,255,255,0.3)';
+    g.strokeRect(-LOWER_RECT_W/2+5, LOWER_TOP+4, LOWER_RECT_W-10, 6);
+  }
+
+  const hullTopY = HULL_TOP_Y;
+
+  // fusca trasera de la torreta
+  g.fillStyle = shadeColor(turretColorSrc.base,-10);
+  g.fillRect(facing>0 ? -20 : 8, hullTopY-6, 12, 7);
+
+  // torreta (trapecio) + cañón
+  g.save();
+  g.translate(facing*4, hullTopY+2);
+  const turretColor = shadeColor(turretColorSrc.base,-15);
+  g.fillStyle = turretColor;
+  g.beginPath();
+  g.moveTo(-14,6); g.lineTo(14,6); g.lineTo(8,-9); g.lineTo(-8,-9);
+  g.closePath(); g.fill();
+  g.strokeStyle='rgba(0,0,0,0.3)'; g.stroke();
+  g.fillStyle = shadeColor(turretColor,-15);
+  g.beginPath(); g.arc(-facing*3,-1,2.6,0,Math.PI*2); g.fill();
+
+  // remaches de la torreta (construcción remachada)
+  if(turretColorSrc.rivets){
+    g.fillStyle='rgba(0,0,0,0.4)';
+    [-10,-3,4,11].forEach(rx=>{ g.beginPath(); g.arc(rx,4,0.9,0,Math.PI*2); g.fill(); });
+  }
+
+  if(o.showCupola){
+    // cúpula del comandante
+    g.fillStyle = shadeColor(turretColor,-12);
+    g.beginPath(); g.arc(facing*2,-8,3.8,0,Math.PI*2); g.fill();
+    g.strokeStyle='rgba(0,0,0,0.3)'; g.stroke();
+  }
+  if(o.turretNumber){
+    g.fillStyle='#f0ece0'; g.strokeStyle='#1a1a14'; g.lineWidth=0.6;
+    g.font='bold 8px monospace'; g.textAlign='center'; g.textBaseline='middle';
+    g.strokeText(o.turretNumber, facing*-6, 4);
+    g.fillText(o.turretNumber, facing*-6, 4);
+    g.lineWidth=1;
+  }
+
+  if(o.antenna){
+    g.strokeStyle='#2a2a24'; g.lineWidth=1.6;
+    g.beginPath(); g.moveTo(facing*10,-6); g.lineTo(facing*20,-34); g.stroke();
+    g.fillStyle='#2a2a24'; g.beginPath(); g.arc(facing*20,-34,2.4,0,Math.PI*2); g.fill();
+    g.lineWidth=1;
+  }
+
+  g.rotate(-(o.turretAngle||0)*facing);
+  const bl = o.barrelLen||32, bw = o.barrelW||3.2;
+  g.fillStyle = shadeColor(turretColor,-8);
+  g.fillRect(facing>0? 2 : -11, -bw/2-1.5, 9, bw+3);      // mantelete
+  g.fillStyle = '#1c1c1c';
+  g.fillRect(facing>0? 4 : -4-bl, -bw/2, bl, bw);        // cañón
+  g.fillStyle = '#111';
+  g.fillRect(facing>0? 4+bl-5 : -4-bl, -bw/2-0.7, 6, bw+1.4); // freno de boca
+  g.restore();
+
+  // barra de vida
+  if(o.showHp){
+    g.save();
+    g.rotate(-(o.angle||0));
+    const pct = Math.max(0, o.hpPct);
+    g.fillStyle='#000'; g.fillRect(-18, hullTopY-20, 36,5);
+    g.fillStyle = pct>0.5?'#3fae3f':pct>0.25?'#d9a832':'#c0392b';
+    g.fillRect(-18, hullTopY-20, 36*pct,5);
+    g.restore();
+  }
+
+  g.restore();
+}
+
+function drawTank(t, color, isPlayer){
+  const sx = worldToScreenX(t.x);
+  if(sx<-70 || sx>W+70) return;
+  const gy = terrainY(t.x);
+  const ang = terrainAngle(t.x);
+  const facing = isPlayer ? (t.facing||1) : (player.x < t.x ? -1 : 1);
+  const gs = isPlayer ? GUN_STATS[t.gunType||'base'] : null;
+
+  renderTank(ctx, {
+    x:sx, y:gy, scale:1, angle:ang, turretAngle:t.turretAngle, facing,
+    color,
+    hullColor: isPlayer ? getVisualStyle('armor') : null,
+    trackColor: isPlayer ? getVisualStyle('speed') : null,
+    turretColor: isPlayer ? getVisualStyle('reload') : null,
+    barrelLen: gs ? gs.barrelLen : 32, barrelW: gs ? gs.barrelW : 3.2,
+    antenna: isPlayer,
+    showCupola: isPlayer,
+    turretNumber: isPlayer ? '811' : t.turretNumber,
+    showHp:true, hpPct: t.hp/t.maxHp
+  });
+}
+
+function drawParticles(){
+  particles.forEach(p=>{
+    ctx.globalAlpha = Math.max(0,p.life/25);
+    ctx.fillStyle=p.color;
+    ctx.fillRect(worldToScreenX(p.x)-2, p.y-2, 4,4);
+    ctx.globalAlpha=1;
+  });
+}
+
+function drawBullets(){
+  bullets.forEach(b=>{
+    const sx = worldToScreenX(b.x);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1;
+    if(b.shape==='triangle'){
+      const ang = Math.atan2(b.vy, b.vx);
+      ctx.save();
+      ctx.translate(sx, b.y);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(6,0); ctx.lineTo(-4,-4); ctx.lineTo(-4,4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(sx, b.y, b.isPlayer&&b.ammo==='HE'?4.5:3, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  });
+}
+
+// ---------- Combat ----------
+// Resuelve el ángulo de disparo que realmente impacta al blanco, compensando la gravedad
+// (en vez de apuntar en línea recta, que hace que el proyectil caiga antes de llegar).
+// dyRaw sigue la misma convención que el resto del código: terrainY(blanco) - alturaDelCañón.
+function solveBallisticAngle(dist, dyRaw, speed){
+  const h = -dyRaw; // altura del blanco relativa al cañón, positivo = más arriba
+  const g = GRAVITY;
+  if(dist < 1) return h>0 ? 1.2 : -0.15;
+  const A = (g*dist*dist)/(2*speed*speed);
+  const disc = dist*dist - 4*A*(h+A);
+  if(disc < 0) return 1.1; // fuera de alcance a esta velocidad: apunta bien alto como mejor esfuerzo
+  const sq = Math.sqrt(disc);
+  const u = (dist - sq)/(2*A); // raíz "baja" -> trayectoria más directa
+  return Math.atan(u);
+}
+
+function effectiveGunAngle(t, facing){
+  // Sin estabilizador: la inclinación del casco sobre el terreno afecta la puntería real del cañón
+  const ang = terrainAngle(t.x);
+  return t.turretAngle - ang*facing;
+}
+
+// Calcula el ángulo de disparo (mundo) necesario para que un proyectil con velocidad v y gravedad g
+// impacte un blanco a distancia horizontal D y desnivel vertical dy (positivo = blanco más abajo en pantalla).
+// Resuelve la ecuación balística real en vez de apuntar en línea recta, así el disparo sí le pega al jugador.
+function computeBallisticAngle(D, dy, v, g){
+  if(D < 1) return dy < 0 ? 1.3 : 0;
+  const k = 0.5*g*D*D/(v*v);
+  if(Math.abs(k) < 1e-6) return Math.atan2(-dy, D);
+  const disc = D*D - 4*k*(k-dy);
+  if(disc < 0) return Math.atan2(-dy, D); // fuera de alcance con esta velocidad: mejor esfuerzo
+  const sqrtDisc = Math.sqrt(disc);
+  const T1 = (D + sqrtDisc)/(2*k);
+  const T2 = (D - sqrtDisc)/(2*k);
+  // se elige la trayectoria más rasante (menor ángulo) que sea físicamente válida
+  const chosen = Math.abs(T1) < Math.abs(T2) ? T1 : T2;
+  return Math.atan(chosen);
+}
+
+function turretTip(t, isPlayer){
+  const gy = terrainY(t.x);
+  const facing = isPlayer ? t.facing : (player.x < t.x ? -1 : 1);
+  const pivotY = gy + TURRET_PIVOT_Y;
+  const len = isPlayer ? GUN_STATS[t.gunType||'base'].barrelLen : 32;
+  const eff = effectiveGunAngle(t, facing);
+  return {
+    x: t.x + Math.cos(eff)*len*facing,
+    y: pivotY - Math.sin(eff)*len,
+    facing
+  };
+}
+
+function fireBullet(t, isPlayer){
+  const tip = turretTip(t, isPlayer);
+  const eff = effectiveGunAngle(t, tip.facing);
+  let speed, dmg, ammo;
+  if(isPlayer){
+    const gs = GUN_STATS[t.gunType||'base'];
+    speed = gs.bulletSpeed;
+    ammo = gs.useAmmoType ? t.ammo : 'AP';
+    dmg = gs.useAmmoType ? dmgFor(t.ammo) : gs.dmg;
+  } else {
+    speed = 9;
+    ammo = 'AP';
+    dmg = t.dmg||14;
+  }
+  bullets.push({
+    x: tip.x, y: tip.y,
+    vx: Math.cos(eff)*speed*tip.facing,
+    vy: -Math.sin(eff)*speed,
+    isPlayer, ammo, dmg, life: 240
+  });
+}
+
+function dmgFor(ammo){
+  const base = ammo==='AP' ? 32 : 20;
+  return base + upgrades.damage*8;
+}
+
+function drawInfantry(inf){
+  const sx = worldToScreenX(inf.x);
+  if(sx<-40 || sx>W+40) return;
+  const gy = terrainY(inf.x);
+  const isWinter = campaign===2;
+  const uniform = isWinter ? '#e4e0d2' : '#5c6b45';
+  const uniformDark = isWinter ? '#c9c4b2' : '#4a5638';
+  ctx.save();
+  ctx.translate(sx, gy);
+  // piernas
+  ctx.fillStyle = uniformDark;
+  ctx.fillRect(-4,-14,3,14);
+  ctx.fillRect(1,-14,3,14);
+  // botas
+  ctx.fillStyle = '#2a2420';
+  ctx.fillRect(-5,-3,4,3);
+  ctx.fillRect(1,-3,4,3);
+  // torso
+  ctx.fillStyle = uniform;
+  ctx.fillRect(-5,-26,10,13);
+  // cabeza
+  ctx.fillStyle = '#c9a074';
+  ctx.beginPath(); ctx.arc(0,-29,3.2,0,Math.PI*2); ctx.fill();
+  // casco
+  ctx.fillStyle = isWinter ? '#d6d1c2' : '#4a5535';
+  ctx.beginPath(); ctx.arc(0,-30,4,Math.PI,0); ctx.fill();
+  ctx.fillRect(-4,-30,8,1.5);
+  // arma: Panzerfaust (tubo con cabeza cónica) o fusil normal
+  if(inf.kind==='panzerfaust'){
+    ctx.strokeStyle = '#3a3226'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(-6,-19); ctx.lineTo(11,-22); ctx.stroke();
+    ctx.fillStyle = '#4a4030';
+    ctx.beginPath();
+    ctx.moveTo(9,-25); ctx.lineTo(19,-27); ctx.lineTo(19,-18); ctx.lineTo(9,-19);
+    ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 1;
+  } else {
+    ctx.strokeStyle = '#2a241c'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-6,-20); ctx.lineTo(9,-24); ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+  // barra de vida
+  const pct = Math.max(0, inf.hp/inf.maxHp);
+  ctx.fillStyle='#000'; ctx.fillRect(-9,-40,18,4);
+  ctx.fillStyle = pct>0.5?'#3fae3f':pct>0.25?'#d9a832':'#c0392b';
+  ctx.fillRect(-9,-40,18*pct,4);
+  ctx.restore();
+}
+
+function fireInfantryBullet(inf){
+  const gy = terrainY(inf.x) - 14;
+  const dx = player.x - inf.x;
+  const dist = Math.abs(dx) || 1;
+  const plY = terrainY(player.x) - 8 - 13;
+  const dy = plY - gy;
+  const ang = Math.atan2(-dy, dist);
+  const isPF = inf.kind==='panzerfaust';
+  const speed = isPF ? 6.5 : 7.5;
+  const facing = Math.sign(dx) || 1;
+  bullets.push({
+    x: inf.x, y: gy,
+    vx: Math.cos(ang)*speed*facing,
+    vy: -Math.sin(ang)*speed,
+    isPlayer:false, ammo:'AP', dmg:inf.dmg, life:200,
+    shape: isPF ? 'triangle' : 'circle'
+  });
+}
+
+function drawATGun(atg){
+  const sx = worldToScreenX(atg.x);
+  if(sx<-60 || sx>W+60) return;
+  const gy = terrainY(atg.x);
+  const facing = player.x < atg.x ? -1 : 1;
+  ctx.save();
+  ctx.translate(sx, gy);
+
+  // patas del afuste, abiertas hacia atrás
+  ctx.strokeStyle = '#33381f'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-facing*7,-16); ctx.lineTo(-facing*32,-3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-facing*7,-16); ctx.lineTo(-facing*30,-16); ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // rueda
+  drawWheel(ctx, 0, -9, 9.5);
+
+  // afuste / base
+  ctx.fillStyle = '#434f30';
+  ctx.fillRect(-7,-20,14,7);
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeRect(-7,-20,14,7);
+
+  // escudo protector inclinado
+  ctx.fillStyle = '#4f5c37';
+  ctx.beginPath();
+  ctx.moveTo(facing*-6,-32); ctx.lineTo(facing*8,-33); ctx.lineTo(facing*9,-13); ctx.lineTo(facing*-7,-13);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke();
+
+  // cañón (gira apuntando al jugador)
+  ctx.save();
+  ctx.translate(facing*4,-21);
+  ctx.rotate(-atg.turretAngle*facing);
+  ctx.fillStyle = '#26281f';
+  ctx.fillRect(facing>0?0:-42, -2.6, 42, 5.2);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(facing>0?42-7:-42, -3.2, 8, 6.4);
+  ctx.restore();
+
+  // barra de vida
+  const pct = Math.max(0, atg.hp/atg.maxHp);
+  ctx.fillStyle='#000'; ctx.fillRect(-16,-42,32,5);
+  ctx.fillStyle = pct>0.5?'#3fae3f':pct>0.25?'#d9a832':'#c0392b';
+  ctx.fillRect(-16,-42,32*pct,5);
+  ctx.restore();
+}
+
+function fireATGunBullet(atg){
+  const facing = player.x < atg.x ? -1 : 1;
+  const gy = terrainY(atg.x) - 21;
+  const dx = player.x - atg.x;
+  const dist = Math.abs(dx) || 1;
+  const speed = 10;
+  bullets.push({
+    x: atg.x + facing*4, y: gy,
+    vx: Math.cos(atg.turretAngle)*speed*facing,
+    vy: -Math.sin(atg.turretAngle)*speed,
+    isPlayer:false, ammo:'AP', dmg:atg.dmg, life:240
+  });
+}
+
+// Explosión HE: daña en un pequeño radio a todo lo que toque, sea suelo, tanque, infantería o cañón antitanque
+function explodeHE(x,y){
+  const RADIUS = 50;
+  const dmgVal = dmgFor('HE');
+  spawnParticles(x,y,'#ff9d3a',14);
+  spawnParticles(x,y,'#ffcf5c',8);
+  enemies.forEach(en=>{
+    if(en.dead) return;
+    const enY = terrainY(en.x) - 8 - 13;
+    if(Math.hypot(x-en.x, y-enY) <= RADIUS) en.hp -= dmgVal;
+  });
+  infantry.forEach(inf=>{
+    if(inf.dead) return;
+    const infY = terrainY(inf.x) - 14;
+    if(Math.hypot(x-inf.x, y-infY) <= RADIUS) inf.hp -= dmgVal*1.2;
+  });
+  atguns.forEach(atg=>{
+    if(atg.dead) return;
+    const atgY = terrainY(atg.x) - 21;
+    if(Math.hypot(x-atg.x, y-atgY) <= RADIUS) atg.hp -= dmgVal*1.3;
+  });
+}
+
+function spawnParticles(x,y,color,n=10){
+  for(let i=0;i<n;i++){
+    particles.push({x,y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-1,life:20+Math.random()*10,color});
+  }
+}
+
+// ---------- Update ----------
+function update(){
+  if(!running) return;
+  if(artilleryMode){
+    updateHUD();
+    return;
+  }
+  updateArtilleryEffects();
+
+  if(keys['a']){ player.x -= player.speed; } // retrocede, sin girar el chasis
+  if(keys['d']){ player.x += player.speed; player.facing=1; }
+  player.x = Math.max(20, Math.min(worldWidth-20, player.x));
+
+  const turretSpeed = GUN_STATS[player.gunType].turretSpeed;
+  if(keys['w']) player.turretAngle = Math.min(1.4, player.turretAngle + turretSpeed);
+  if(keys['s']) player.turretAngle = Math.max(-0.25, player.turretAngle - turretSpeed);
+
+  camX = Math.max(0, Math.min(worldWidth - W, player.x - W*0.4));
+
+  const gs = GUN_STATS[player.gunType];
+  if(player.magReloading){
+    player.magReloadTimer--;
+    if(player.magReloadTimer<=0){
+      player.magReloading = false;
+      player.rounds = gs.mag;
+    }
+  } else {
+    player.reload = Math.max(0, player.reload-1);
+    if((keys[' '] || keys['enter'] || mouseDown) && player.reload<=0 && player.rounds>0){
+      fireBullet(player, true);
+      player.rounds--;
+      player.reload = player.reloadMax;
+      if(player.rounds<=0){
+        player.magReloading = true;
+        player.magReloadTimer = Math.round(gs.reloadSec*60);
+      }
+    }
+  }
+
+  enemies.forEach(en=>{
+    if(en.dead) return;
+    const rawDist = player.x - en.x;
+    const dist = Math.abs(rawDist);
+
+    // movement: approach if too far, back off if too close, hold at preferred distance
+    if(dist > en.preferredDist + 30){
+      en.x += Math.sign(rawDist) * en.speed;
+      en.facing = Math.sign(rawDist) || en.facing;
+    } else if(dist < en.preferredDist - 30){
+      en.x -= Math.sign(rawDist) * en.speed;
+      en.facing = Math.sign(rawDist) || en.facing;
+    }
+    en.x = Math.max(20, Math.min(worldWidth-20, en.x));
+
+    if(dist < en.range){
+      const facing = player.x < en.x ? -1 : 1;
+      const hullAng = terrainAngle(en.x);
+      const launchY = terrainY(en.x) + TURRET_PIVOT_Y;
+      const targetY = terrainY(player.x) - 8 - 13; // mismo punto que usa la colisión del jugador
+      const dy = targetY - launchY;
+      const worldDesired = computeBallisticAngle(dist, dy, 9, GRAVITY); // 9 = velocidad del proyectil enemigo
+      const hullRelDesired = worldDesired + hullAng*facing; // compensa la inclinación del casco (sin estabilizador)
+      en.turretAngle += (Math.max(-1.15,Math.min(1.3,hullRelDesired)) - en.turretAngle)*0.12;
+      en.reload--;
+      if(en.reload<=0){
+        fireBullet(en, false);
+        en.reload = en.reloadMax;
+      }
+    }
+  });
+
+  // Evita que los tanques se apilen al acercarse al jugador.
+  for(let i=0;i<enemies.length;i++){
+    const a = enemies[i];
+    if(a.dead) continue;
+    for(let j=i+1;j<enemies.length;j++){
+      const b = enemies[j];
+      if(b.dead) continue;
+      const gap = b.x-a.x;
+      const minGap = 92;
+      if(Math.abs(gap)<minGap){
+        const dir = gap===0 ? (i%2?1:-1) : Math.sign(gap);
+        const push = (minGap-Math.abs(gap))*0.32;
+        a.x = Math.max(25, a.x-dir*push);
+        b.x = Math.min(worldWidth-25, b.x+dir*push);
+      }
+    }
+  }
+
+  infantry.forEach(inf=>{
+    if(inf.dead) return;
+    const dist = Math.abs(player.x - inf.x);
+    if(dist < inf.range){
+      inf.reload--;
+      if(inf.reload<=0){
+        fireInfantryBullet(inf);
+        inf.reload = inf.reloadMax;
+      }
+    }
+  });
+
+  atguns.forEach(atg=>{
+    if(atg.dead) return;
+    const dist = Math.abs(player.x - atg.x);
+    if(dist < atg.range){
+      const dy = terrainY(player.x) - (terrainY(atg.x)-21);
+      const desired = Math.atan2(-dy, dist);
+      atg.turretAngle += (Math.max(-1.15,Math.min(1.2,desired)) - atg.turretAngle)*0.09;
+      atg.reload--;
+      if(atg.reload<=0){
+        fireATGunBullet(atg);
+        atg.reload = atg.reloadMax;
+      }
+    }
+  });
+
+  bullets.forEach(b=>{
+    b.vy += GRAVITY;
+    b.x += b.vx; b.y += b.vy;
+    b.life--;
+    if(b.y >= terrainY(b.x)){
+      if(b.isPlayer && b.ammo==='HE'){
+        explodeHE(b.x,b.y);
+      } else {
+        spawnParticles(b.x,b.y,'#8a7a5a',8);
+      }
+      b.dead = true;
+    }
+  });
+
+  bullets.forEach(b=>{
+    if(b.dead) return;
+    if(b.isPlayer){
+      if(b.ammo==='HE'){
+        let touched = false;
+        enemies.forEach(en=>{
+          if(en.dead || touched) return;
+          const enY = terrainY(en.x) - 8 - 13;
+          if(Math.abs(b.x-en.x)<25 && Math.abs(b.y-enY)<28) touched = true;
+        });
+        infantry.forEach(inf=>{
+          if(inf.dead || touched) return;
+          const infY = terrainY(inf.x) - 14;
+          if(Math.abs(b.x-inf.x)<14 && Math.abs(b.y-infY)<18) touched = true;
+        });
+        atguns.forEach(atg=>{
+          if(atg.dead || touched) return;
+          const atgY = terrainY(atg.x) - 21;
+          if(Math.abs(b.x-atg.x)<20 && Math.abs(b.y-atgY)<24) touched = true;
+        });
+        if(touched){
+          explodeHE(b.x,b.y);
+          b.dead = true;
+        }
+      } else {
+        enemies.forEach(en=>{
+          if(en.dead || b.dead) return;
+          const enY = terrainY(en.x) - 8 - 13;
+          if(Math.abs(b.x-en.x)<25 && Math.abs(b.y-enY)<28){
+            en.hp -= b.dmg * (en.kind==='heavy' ? 1.15 : 1);
+            b.dead = true;
+            spawnParticles(b.x,b.y,'#ffcf5c',6);
+          }
+        });
+        infantry.forEach(inf=>{
+          if(inf.dead || b.dead) return;
+          const infY = terrainY(inf.x) - 14;
+          if(Math.abs(b.x-inf.x)<14 && Math.abs(b.y-infY)<18){
+            inf.hp -= b.dmg*0.35; // la munición perforante es poco efectiva contra infantería
+            b.dead = true;
+            spawnParticles(b.x,b.y,'#ffcf5c',5);
+          }
+        });
+        atguns.forEach(atg=>{
+          if(atg.dead || b.dead) return;
+          const atgY = terrainY(atg.x) - 21;
+          if(Math.abs(b.x-atg.x)<20 && Math.abs(b.y-atgY)<24){
+            atg.hp -= b.dmg*0.5; // el escudo protege parcialmente contra munición perforante
+            b.dead = true;
+            spawnParticles(b.x,b.y,'#ffcf5c',6);
+          }
+        });
+      }
+    } else {
+      const plY = terrainY(player.x)-8-13;
+      if(Math.abs(b.x-player.x)<23 && Math.abs(b.y-plY)<28){
+        player.hp -= b.dmg;
+        b.dead = true;
+        spawnParticles(b.x,b.y,'#ff6b4a',6);
+      }
+    }
+  });
+  bullets = bullets.filter(b=>!b.dead && b.life>0);
+
+  enemies.forEach(en=>{
+    if(en.hp<=0 && !en.dead){
+      en.dead = true;
+      spawnParticles(en.x, terrainY(en.x)-20, '#333', 16);
+      const reward=en.kind==='heavy'?30:en.kind==='fast'?15:20;
+      credits += reward; partsCoins += reward; ammoCoins += Math.ceil(reward/2);
+    }
+  });
+
+  infantry.forEach(inf=>{
+    if(inf.hp<=0 && !inf.dead){
+      inf.dead = true;
+      spawnParticles(inf.x, terrainY(inf.x)-25, '#333', 10);
+      const reward=inf.kind==='panzerfaust' ? 15 : 8;
+      credits += reward; partsCoins += reward; ammoCoins += Math.ceil(reward/2);
+    }
+  });
+
+  atguns.forEach(atg=>{
+    if(atg.hp<=0 && !atg.dead){
+      atg.dead = true;
+      spawnParticles(atg.x, terrainY(atg.x)-25, '#333', 16);
+      credits += 25; partsCoins += 25; ammoCoins += 12;
+    }
+  });
+
+  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life--;});
+  particles = particles.filter(p=>p.life>0);
+
+  updateHUD();
+
+  if(player.hp<=0){
+    running=false;
+    gameOver(false);
+    return;
+  }
+  if(player.x >= flag.x){
+    if(tutorialMode){
+      if(!tutorialShot || artilleryShells.length || artilleryDebris.length){
+        player.x=flag.x-8;
+        toast(!tutorialShot ? 'USA Q Y CONFIRMA UN ATAQUE DE ARTILLERÍA ANTES DE TERMINAR' : 'ESPERA A QUE TERMINE LA SALVA DE ARTILLERÍA', 1800);
+        return;
+      }
+      tutorialMode=false;
+      tutorialFinished=true;
+      try{localStorage.setItem('tankCommanderTutorialComplete','1');}catch(e){}
+      running=false;
+      showTutorialComplete();
+      return;
+    }
+    running=false;
+    levelComplete();
+  }
+}
+
+// Simula el disparo del jugador (misma física que un proyectil real) para saber dónde caería
+function predictImpactPoint(){
+  const tip = turretTip(player, true);
+  const eff = effectiveGunAngle(player, tip.facing);
+  const speed = GUN_STATS[player.gunType].bulletSpeed;
+  let x = tip.x, y = tip.y;
+  let vx = Math.cos(eff)*speed*tip.facing;
+  let vy = -Math.sin(eff)*speed;
+  for(let i=0; i<400; i++){
+    vy += GRAVITY;
+    x += vx; y += vy;
+    if(y >= terrainY(x)) break;
+    if(x < -400 || x > worldWidth+400) break;
+  }
+  return {x,y};
+}
+
+// Simula el disparo del jugador con la física real (según el cañón equipado) y devuelve
+// el punto de impacto, el camino recorrido y qué lo bloquea (suelo, tanque, infantería o cañón antitanque)
+function predictImpactPoint(){
+  const gs = GUN_STATS[player.gunType];
+  const tip = turretTip(player, true);
+  const eff = effectiveGunAngle(player, tip.facing);
+  let x = tip.x, y = tip.y;
+  let vx = Math.cos(eff)*gs.bulletSpeed*tip.facing;
+  let vy = -Math.sin(eff)*gs.bulletSpeed;
+  const path = [{x,y}];
+  let blockedBy = null;
+  for(let i=0; i<320 && !blockedBy; i++){
+    vy += GRAVITY;
+    x += vx; y += vy;
+    path.push({x,y});
+    if(y >= terrainY(x)){ blockedBy = {type:'ground'}; break; }
+    for(const en of enemies){
+      if(en.dead) continue;
+      const enY = terrainY(en.x)-8-13;
+      if(Math.abs(x-en.x)<25 && Math.abs(y-enY)<28){ blockedBy={type:'enemy',obj:en}; break; }
+    }
+    if(blockedBy) break;
+    for(const inf of infantry){
+      if(inf.dead) continue;
+      const infY = terrainY(inf.x)-14;
+      if(Math.abs(x-inf.x)<14 && Math.abs(y-infY)<18){ blockedBy={type:'infantry',obj:inf}; break; }
+    }
+    if(blockedBy) break;
+    for(const atg of atguns){
+      if(atg.dead) continue;
+      const atgY = terrainY(atg.x)-21;
+      if(Math.abs(x-atg.x)<20 && Math.abs(y-atgY)<24){ blockedBy={type:'atgun',obj:atg}; break; }
+    }
+  }
+  return { x, y, path, blockedBy };
+}
+
+function drawReticle(){
+  if(!player) return;
+  const p = predictImpactPoint();
+  const sx = worldToScreenX(p.x);
+
+  // línea punteada de trayectoria
+  ctx.save();
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  p.path.forEach((pt,i)=>{
+    const psx = worldToScreenX(pt.x);
+    if(i===0) ctx.moveTo(psx, pt.y); else ctx.lineTo(psx, pt.y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  if(sx < -20 || sx > W+20) return;
+  const sy = p.y;
+  const blocked = p.blockedBy;
+  const onTarget = blocked && blocked.type!=='ground';
+  const color = onTarget ? 'rgba(255,60,40,0.95)' : 'rgba(255,210,90,0.9)';
+
+  // halo de radio de explosión si la munición es HE
+  const gs = GUN_STATS[player.gunType];
+  if(gs.useAmmoType && player.ammo==='HE'){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,157,58,0.5)';
+    ctx.setLineDash([3,3]);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(sx, sy, 50, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 9, 0, Math.PI*2);
+  ctx.moveTo(sx-15, sy); ctx.lineTo(sx-5, sy);
+  ctx.moveTo(sx+5, sy);  ctx.lineTo(sx+15, sy);
+  ctx.moveTo(sx, sy-15); ctx.lineTo(sx, sy-5);
+  ctx.moveTo(sx, sy+5);  ctx.lineTo(sx, sy+15);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI*2); ctx.fill();
+
+  // resalta con un anillo el blanco que bloquea la trayectoria, y lo etiqueta
+  if(onTarget){
+    ctx.strokeStyle = 'rgba(255,60,40,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, sy, 20, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,60,40,0.95)';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    const label = blocked.type==='enemy' ? '¡TANQUE EN LA MIRA!' : blocked.type==='atgun' ? '¡CAÑÓN EN LA MIRA!' : '¡BLOQUEADO POR INFANTERÍA!';
+    ctx.fillText(label, sx, sy-28);
+  }
+  ctx.restore();
+}
+
+function drawArtilleryOverlay(){
+  if(!player) return;
+  const x = artilleryMode ? artilleryTargetX : artilleryImpact && artilleryImpact.x;
+  if(x==null) return;
+  const sx = worldToScreenX(x);
+  const sy = terrainY(x)-5;
+  const radiusPx = ARTILLERY_RADIUS;
+  ctx.save();
+  ctx.fillStyle = artilleryMode ? 'rgba(230,170,45,.13)' : `rgba(220,65,35,${Math.max(.08,(artilleryImpact.life/52)*.22)})`;
+  ctx.strokeStyle = artilleryMode ? 'rgba(255,224,102,.95)' : 'rgba(255,105,55,.8)';
+  ctx.lineWidth = artilleryMode ? 3 : 4;
+  ctx.setLineDash(artilleryMode ? [10,7] : [4,3]);
+  ctx.beginPath(); ctx.arc(sx,sy,radiusPx,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(255,236,150,.8)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(sx-12,sy);ctx.lineTo(sx+12,sy);ctx.moveTo(sx,sy-12);ctx.lineTo(sx,sy+12);ctx.stroke();
+  ctx.fillStyle='#fff1a8';ctx.font='bold 12px monospace';ctx.textAlign='center';
+  ctx.fillText(artilleryMode ? 'ZONA DE DISPERSIÓN · CLIC PARA CONFIRMAR' : 'IMPACTO DE ARTILLERÍA', sx, sy-radiusPx-12);
+  ctx.restore();
+}
+
+function drawArtilleryEffects(){
+  artilleryShells.forEach(shell=>{
+    const sx=worldToScreenX(shell.x);
+    if(sx<-40 || sx>W+40) return;
+    ctx.save();
+    ctx.translate(sx,shell.y);
+    const angle=Math.atan2(shell.vy,shell.vx)-Math.PI/2;
+    ctx.rotate(angle);
+    // Silueta inspirada en la munición de referencia: cuerpo oliva, punta cónica y banda metálica.
+    ctx.fillStyle='#4b5533';ctx.beginPath();ctx.moveTo(0,-28);ctx.quadraticCurveTo(11,-15,10,12);ctx.lineTo(7,25);ctx.quadraticCurveTo(0,31,-7,25);ctx.lineTo(-10,12);ctx.quadraticCurveTo(-11,-15,0,-28);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#1f2b1c';ctx.beginPath();ctx.moveTo(0,-35);ctx.lineTo(7,-24);ctx.lineTo(-7,-24);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#bc7438';ctx.fillRect(-9,12,18,4);ctx.strokeStyle='rgba(0,0,0,.55)';ctx.stroke();
+    ctx.restore();
+  });
+  artilleryDebris.forEach(bit=>{
+    const sx=worldToScreenX(bit.x);
+    if(sx<-10 || sx>W+10) return;
+    ctx.save();ctx.translate(sx,bit.y);ctx.rotate(bit.x*.04);ctx.fillStyle=bit.color;
+    ctx.fillRect(-bit.size/2,-bit.size/2,bit.size,bit.size);ctx.restore();
+  });
+}
+
+function drawTutorialGuide(){
+  if(!tutorialMode || !player) return;
+  let title, body;
+  if(player.x<350){ title='PASO 1 · MOVERSE'; body='A/D o ◄ ► para avanzar hacia la derecha'; }
+  else if(player.x<700){ title='PASO 2 · APUNTAR Y DISPARAR'; body='W/S o ▲ ▼ · ESPACIO/FUEGO contra los blancos'; }
+  else if(!tutorialShot){ title='PASO 3 · ARTILLERÍA'; body='Pulsa Q o LLAMAR ARTILLERÍA, apunta y confirma'; }
+  else { title='PASO 4 · FINALIZAR'; body='Avanza hasta la bandera para completar el entrenamiento'; }
+  ctx.save();
+  ctx.fillStyle='rgba(8,10,5,.78)';ctx.fillRect(18,72,360,58);
+  ctx.strokeStyle='rgba(201,162,39,.8)';ctx.strokeRect(18,72,360,58);
+  ctx.fillStyle='#f0cf62';ctx.font='bold 13px monospace';ctx.fillText(title,30,94);
+  ctx.fillStyle='#e8e3d0';ctx.font='11px monospace';ctx.fillText(body,30,114);
+  ctx.restore();
+}
+
+function render(){
+  drawSky();
+  drawTerrain();
+  drawArtilleryEffects();
+  drawFlag();
+  drawParticles();
+  enemies.forEach(en=>{ if(!en.dead) drawTank(en, tankColor(en.kind), false); });
+  infantry.forEach(inf=>{ if(!inf.dead) drawInfantry(inf); });
+  atguns.forEach(atg=>{ if(!atg.dead) drawATGun(atg); });
+  drawBullets();
+  if(player) drawTank(player, tankColor('player'), true);
+  drawReticle();
+  drawArtilleryOverlay();
+  drawTutorialGuide();
+  if(artilleryImpact){
+    artilleryImpact.life--;
+    if(artilleryImpact.life<=0) artilleryImpact=null;
+  }
+}
+
+function loop(){
+  update();
+  render();
+  if(running) requestAnimationFrame(loop);
+}
+
+// ---------- Screens ----------
+function showScreen(html){ screenEl.innerHTML = html; screenEl.classList.remove('hidden'); }
+function hideScreen(){ screenEl.classList.add('hidden'); }
+
+function showTutorial(){
+  showScreen(`<div style="width:min(760px,94vw);max-height:88vh;overflow-y:auto;padding:8px 18px 18px;">
+    <h2>TUTORIAL DE CAMPAÑA</h2>
+    <p><b>Entrenamiento obligatorio:</b> completa la misión práctica para desbloquear las campañas.</p>
+    <div class="row" style="align-items:stretch;">
+      <div class="shopcard" style="width:330px;text-align:left"><h3>1 · MOVERSE Y APUNTAR</h3><p><b>PC:</b> A/D mueve el tanque. W/S eleva o baja el cañón. ESPACIO dispara y 1/2 cambia el tipo de munición.<br><b>Celular:</b> usa los botones táctiles. La mira punteada calcula la trayectoria y el anillo rojo muestra el blanco bloqueado.</p></div>
+      <div class="shopcard" style="width:330px;text-align:left"><h3>2 · MUNICIÓN</h3><p><b>AP:</b> perforante, precisa contra tanques y cañones; es menos efectiva contra infantería.<br><b>HE:</b> explosiva, produce daño de área y es la mejor opción contra grupos de soldados y posiciones fijas.</p></div>
+      <div class="shopcard" style="width:330px;text-align:left"><h3>3 · ENEMIGOS</h3><p><b>Tanque normal:</b> equilibrado. <b>Rápido:</b> poca vida y mucha movilidad. <b>Pesado:</b> mucha vida y blindaje.<br><b>Infantería:</b> aparece en escuadras; identifica al soldado con Panzerfaust. <b>Cañón antitanque:</b> posición fija y peligrosa.</p></div>
+      <div class="shopcard" style="width:330px;text-align:left"><h3>4 · LLAMAR ARTILLERÍA [Q]</h3><p>Una vez por nivel, pulsa Q o el botón móvil. El tiempo se detiene. Selecciona un punto dentro del círculo grande con clic o toque. Tres proyectiles grandes caerán desde el cielo; al tocar el suelo explotan y dañan un área amplia.</p></div>
+      <div class="shopcard" style="width:330px;text-align:left"><h3>5 · PROGRESIÓN</h3><p>Avanza por 5 campañas con 5 subniveles cada una. Al terminar un subnivel puedes mejorar blindaje, daño, velocidad y recarga. Al completar una campaña se abre la tienda de repuestos del garage.</p></div>
+    </div>
+    <button id="tutorialStartBtn" style="margin-top:14px;">INICIAR ENTRENAMIENTO JUGABLE</button>
+  </div>`);
+  document.getElementById('tutorialStartBtn').onclick=startTutorialMission;
+}
+
+function showTutorialComplete(){
+  showScreen(`<h2>ENTRENAMIENTO COMPLETADO</h2><p>Ya conoces el movimiento, el apuntado, las municiones, los enemigos y la artillería. Las campañas están desbloqueadas.</p><button id="unlockStartBtn">ENTRAR A LA CAMPAÑA</button>`);
+  document.getElementById('unlockStartBtn').onclick=()=>{
+    showScreen(START_SCREEN_HTML);
+    document.getElementById('startBtn').disabled=false;
+    document.getElementById('startBtn').textContent='INICIAR MISIÓN';
+    document.getElementById('startBtn').onclick=()=>{ hideScreen(); level=1; initLevel(); running=true; loop(); };
+    document.getElementById('tutorialBtn').onclick=showTutorial;
+    document.getElementById('mapBtn').onclick=showCampaignMap;
+    document.getElementById('upgradeBtn').onclick=showCommandUpgrades;
+    document.getElementById('ammoBtn').onclick=showAmmoShop;
+    document.getElementById('menuAmmoCoins').textContent=ammoCoins;
+    document.getElementById('menuPartsCoins').textContent=partsCoins;
+  };
+}
+
+function restoreCommandMenu(){
+  showScreen(START_SCREEN_HTML);
+  document.getElementById('menuAmmoCoins').textContent=ammoCoins;
+  document.getElementById('menuPartsCoins').textContent=partsCoins;
+  const sb=document.getElementById('startBtn');
+  sb.disabled=!tutorialFinished;
+  sb.textContent=tutorialFinished?'INICIAR MISIÓN':'COMPLETA EL TUTORIAL PRIMERO';
+  sb.onclick=()=>{ if(!tutorialFinished){showTutorial();return;} hideScreen(); level=1; initLevel(); running=true; loop(); };
+  document.getElementById('tutorialBtn').onclick=showTutorial;
+  document.getElementById('mapBtn').onclick=()=>tutorialFinished?showCampaignMap():showTutorial();
+  document.getElementById('upgradeBtn').onclick=()=>tutorialFinished?showCommandUpgrades():showTutorial();
+  document.getElementById('ammoBtn').onclick=()=>tutorialFinished?showAmmoShop():showTutorial();
+}
+
+function showCommandUpgrades(){
+  const opts=[['armor','BLINDAJE','+25 HP máximo',20],['damage','POTENCIA DE FUEGO','+8 daño AP/HE',25],['speed','ORUGAS','+0.30 velocidad',18],['reload','TORRETA','-3 frames de recarga',22]];
+  showScreen(`<h2>MEJORAS PRINCIPALES</h2><p>Usa la <b style="color:#83c5ff;">moneda azul</b> para reforzar los componentes principales del tanque morado del jugador.</p><p class="wallet parts-wallet">◆ MONEDA AZUL: <b>${partsCoins}</b></p><div class="row">${opts.map(o=>`<div class="shopcard upgrade-accent"><h3>${o[1]}</h3><p>${o[2]}<br>Nivel: ${upgrades[o[0]]}</p><button class="upgrade-accent" data-command-upgrade="${o[0]}" data-cost="${o[3]}" ${partsCoins<o[3]?'disabled':''}>MEJORAR · ${o[3]} ◆</button></div>`).join('')}</div><button id="upgradesBackBtn" class="secondary-btn">VOLVER</button>`);
+  screenEl.querySelectorAll('[data-command-upgrade]').forEach(btn=>btn.onclick=()=>{const cost=Number(btn.dataset.cost);if(partsCoins<cost)return;partsCoins-=cost;upgrades[btn.dataset.commandUpgrade]++;showCommandUpgrades();});
+  document.getElementById('upgradesBackBtn').onclick=restoreCommandMenu;
+}
+
+function showAmmoShop(){
+  showScreen(`<h2>MUNICIÓN</h2><p>Compra reservas con la <b style="color:#ffe178;">moneda amarilla</b>. Se entregan al inicio de tu próxima misión.</p><p class="wallet ammo-wallet">◆ MONEDA AMARILLA: <b>${ammoCoins}</b></p><div class="ammo-shop"><button data-menu-ammo="5">+5 RONDAS · 5 ◆</button> <button data-menu-ammo="15">+15 RONDAS · 14 ◆</button><p>Reserva pendiente: <b>${ammoReserve}</b> rondas.</p></div><button id="ammoBackBtn" class="secondary-btn">VOLVER</button>`);
+  screenEl.querySelectorAll('[data-menu-ammo]').forEach(btn=>btn.onclick=()=>{const amount=Number(btn.dataset.menuAmmo),cost=amount===5?5:14;if(ammoCoins<cost){toast('Moneda amarilla insuficiente',900);return;}ammoCoins-=cost;ammoReserve+=amount;showAmmoShop();});
+  document.getElementById('ammoBackBtn').onclick=restoreCommandMenu;
+}
+
+function showCampaignMap(){
+  const paletteNames = ['Bosques y barro','Nieve y hielo','Desierto y polvo','Estepa gris','Islas tropicales'];
+  const mapHtml = campaignNames.map((name, campIndex)=>{
+    const c = campIndex + 1;
+    const pal = CAMPAIGN_PALETTES[c];
+    const tint = c===2 ? 'rgba(115,145,165,.55)' : c===3 ? 'rgba(173,125,55,.62)' : c===5 ? 'rgba(30,110,105,.58)' : 'rgba(45,75,48,.68)';
+    const nodes = Array.from({length:5}, (_,i)=>{
+      const nodeLevel = campIndex*5+i+1;
+      const state = nodeLevel < furthestLevel ? 'done' : nodeLevel === level ? 'current' : nodeLevel <= furthestLevel ? 'current' : 'locked';
+      const accessible = nodeLevel <= furthestLevel;
+      return `${i ? '<div class="mapLine"></div>' : ''}
+        <div><button class="mapNode ${state}" data-map-level="${accessible ? nodeLevel : ''}" ${accessible?'':'disabled'}>${c}.${i+1}</button><div class="mapSubLabel">${i===0?'Entrada':i===4?'Objetivo':'Sector '+(i+1)}</div></div>`;
+    }).join('');
+    return `<section class="mapBand" style="background:linear-gradient(135deg,${tint},rgba(12,16,12,.76)),linear-gradient(180deg,${pal.skyTop},${pal.ground});">
+      <div class="mapBandLabel">CAMPAÑA ${c} · ${name.toUpperCase()} <span style="float:right;color:#ddd">${paletteNames[campIndex]}</span></div>
+      <div class="mapNodes">${nodes}</div>
+    </section>`;
+  }).join('');
+  showScreen(`<h2>MAPA ESTRATÉGICO</h2>
+    <p>Avanza por las rutas de cada frente. Cada banda representa un teatro de operaciones y cada nodo es un subnivel; los colores cambian con el clima y el terreno de la campaña.</p>
+    <div id="mapWrap">${mapHtml}</div>
+    <div class="mapLegend"><span><i style="background:#c9a227"></i>Actual</span><span><i style="background:#3fae3f"></i>Superado</span><span><i style="background:#3a3a34"></i>Bloqueado</span></div>
+    <button id="mapBackBtn" class="secondary-btn">VOLVER AL MENÚ</button>`);
+  screenEl.querySelectorAll('[data-map-level]').forEach(btn=>btn.onclick=()=>{
+    const selected = Number(btn.dataset.mapLevel);
+    if(selected){ level=selected; hideScreen(); initLevel(); running=true; loop(); }
+  });
+  document.getElementById('mapBackBtn').onclick=()=>{
+    showScreen(START_SCREEN_HTML);
+    const menuStart=document.getElementById('startBtn');
+    menuStart.disabled=!tutorialFinished;
+    menuStart.textContent=tutorialFinished?'INICIAR MISIÓN':'COMPLETA EL TUTORIAL PRIMERO';
+    menuStart.onclick=()=>{ if(!tutorialFinished){showTutorial();return;} hideScreen(); level=1; initLevel(); running=true; loop(); };
+    document.getElementById('tutorialBtn').onclick=showTutorial;
+    document.getElementById('mapBtn').onclick=showCampaignMap;
+    document.getElementById('upgradeBtn').onclick=()=>tutorialFinished?showCommandUpgrades():showTutorial();
+    document.getElementById('ammoBtn').onclick=()=>tutorialFinished?showAmmoShop():showTutorial();
+  };
+}
+
+function gameOver(won){
+  showScreen(`
+    <h1 style="color:${won?'#c9a227':'#c0392b'}">${won?'VICTORIA':'TANQUE DESTRUIDO'}</h1>
+    <p>${won? 'Has completado las 5 campañas. ¡Un comandante legendario!' : `Fuiste eliminado en el subnivel ${subLevel}/5 de la campaña "${campaignNames[campaign-1]}". Créditos acumulados: ${credits}.`}</p>
+    <button id="retryBtn">${won?'JUGAR DE NUEVO':'REINTENTAR NIVEL'}</button>
+  `);
+  document.getElementById('retryBtn').onclick = ()=>{
+    if(won){ level=1; credits=0; ammoCoins=20; partsCoins=0; upgrades.armor=0;upgrades.damage=0;upgrades.speed=0;upgrades.reload=0; partsOwned.length=0; equippedGun='base'; equippedVisual={armor:null,damage:null,speed:null,reload:null}; }
+    hideScreen();
+    initLevel();
+    running=true;
+    loop();
+  };
+}
+
+function levelComplete(){
+  toast(`¡SUBNIVEL ${campaign}-${subLevel} COMPLETADO!`, 1600);
+  furthestLevel = Math.max(furthestLevel, Math.min(MAX_LEVEL, level+1));
+  if(level>=MAX_LEVEL){
+    setTimeout(()=>gameOver(true), 1200);
+    return;
+  }
+  // Las mejoras de estadísticas aparecen tras cada subnivel; la tienda de
+  // repuestos visuales solo se abre al completar la campaña completa.
+  setTimeout(()=>showUpgradeScreen(), 900);
+}
+
+function showUpgradeScreen(){
+  const options = [
+    {key:'armor', label:'BLINDAJE', desc:'+25 HP máximo', value:upgrades.armor, cost:20},
+    {key:'damage', label:'POTENCIA DE FUEGO', desc:'+8 daño AP/HE', value:upgrades.damage, cost:25},
+    {key:'speed', label:'ORUGAS', desc:'+0.30 velocidad', value:upgrades.speed, cost:18},
+    {key:'reload', label:'TORRETA', desc:'-3 frames de recarga', value:upgrades.reload, cost:22},
+  ];
+  const cards = options.map(o=>`<div class="shopcard">
+    <h3>${o.label}</h3><p style="font-size:11px;margin:5px 0;color:#cfcab8;">${o.desc}<br>Nivel actual: <b>${o.value}</b></p>
+    <button class="upgrade-accent" data-upgrade="${o.key}" data-cost="${o.cost}" ${partsCoins<o.cost?'disabled':''}>MEJORAR · ${o.cost} ◆</button>
+  </div>`).join('');
+  const nextText = subLevel===5 ? 'ABRIR TIENDA DE CAMPAÑA ▶' : 'SIGUIENTE SUBNIVEL ▶';
+  showScreen(`<h2>MEJORAS DE CAMPO</h2>
+    <p>Subnivel ${campaign}-${subLevel} superado. Usa los créditos obtenidos para reforzar los componentes principales del tanque antes de continuar.</p>
+    <p style="color:#83c5ff;margin:0;">MONEDA AZUL PARA PARTES: <b id="upgradeCredits">${partsCoins}</b></p>
+    <div class="row">${cards}</div>
+    <button id="continueUpgradeBtn" style="margin-top:8px;">${nextText}</button>`);
+
+  screenEl.querySelectorAll('[data-upgrade]').forEach(btn=>btn.onclick=()=>{
+    const key = btn.dataset.upgrade;
+    const cost = Number(btn.dataset.cost);
+    if(partsCoins<cost) return;
+    partsCoins -= cost;
+    upgrades[key]++;
+    showUpgradeScreen();
+  });
+  document.getElementById('continueUpgradeBtn').onclick=()=>{
+    if(subLevel===5){ showGarage(); return; }
+    level++;
+    hideScreen();
+    initLevel();
+    running=true;
+    loop();
+  };
+}
+
+function partCost(part){
+  const timesBought = partsOwned.filter(p=>p===part.id).length;
+  const base = part.stat==='armor'?40 : part.stat==='damage'?45 : part.stat==='speed'?35 : 50;
+  return base + timesBought*35;
+}
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+// Diseño del despiece: posición ensamblada (compacta) -> posición explotada (separada, con número/etiqueta)
+const PART_LAYOUT = {
+  damage: { assembled:{x:196,y:203}, exploded:{x:80,y:70},  explodedScale:2.1, badge:{x:55,y:32,num:1},  label:'Cañón',
+            angleAssembled:-0.35, angleExploded:-0.15 },
+  reload: { assembled:{x:196,y:203}, exploded:{x:280,y:80}, explodedScale:2.2, badge:{x:325,y:50,num:2}, label:'Torreta' },
+  armor:  { assembled:{x:190,y:222}, exploded:{x:190,y:175},explodedScale:2.0, badge:{x:110,y:175,num:3},label:'Chasis' },
+  speed:  { assembled:{x:190,y:245}, exploded:{x:190,y:285},explodedScale:1.9, badge:{x:190,y:325,num:4},label:'Orugas' },
+};
+const ASSEMBLED_SCALE = 1.15;
+
+function drawPartHull(g,x,y,scale,color,armorPlates){
+  g.save(); g.translate(x,y); g.scale(scale,scale);
+  g.fillStyle = color.base;
+  g.fillRect(-38,-2.5,76,17);
+  g.strokeStyle='rgba(0,0,0,0.35)'; g.strokeRect(-38,-2.5,76,17);
+  g.fillRect(-24,-14.5,48,12);
+  g.strokeRect(-24,-14.5,48,12);
+  if(color.camo){
+    g.globalAlpha=0.92;
+    g.fillStyle=color.campA;
+    drawBlotch(g,-20,3,11,5.5,0.3);
+    drawBlotch(g,14,-9,7,4,0.5);
+    g.fillStyle=color.campB;
+    drawBlotch(g,14,7,9,5,-0.25);
+    drawBlotch(g,-11,-8,6,3.5,0.1);
+    g.globalAlpha=1;
+  }
+  if(color.rivets){
+    drawRivets(g,-36,-1,36,-1,9);
+    drawRivets(g,-22,-13,22,-13,7);
+    drawRivets(g,-36,12,36,12,9);
+  }
+  if(color.schurzen){
+    // placas Vorpanzer separadas del casco (norte de África)
+    g.fillStyle = shadeColor(color.base,-20);
+    g.globalAlpha=0.9;
+    g.fillRect(-36,-10,68,3);
+    g.fillRect(-36,9,68,3);
+    g.globalAlpha=1;
+  }
+  if(armorPlates){
+    g.strokeStyle='rgba(255,255,255,0.3)';
+    g.strokeRect(-33,1,66,6);
+  }
+  // escotilla del conductor
+  g.fillStyle=shadeColor(color.base,-15);
+  g.beginPath(); g.arc(-14,-9,3.2,0,Math.PI*2); g.fill();
+  g.restore();
+}
+
+function drawPartTurret(g,x,y,scale,color,antenna){
+  g.save(); g.translate(x,y); g.scale(scale,scale);
+  const turretColor = shadeColor(color.base,-15);
+  // fusca trasera (más grande en el 7TP, que llevaba un cajón de estibaje característico)
+  const bustleW = color.key==='tp7' ? 18 : 13;
+  g.fillStyle = shadeColor(color.base,-10);
+  g.fillRect(-24-(bustleW-13),-6,bustleW,9);
+  g.fillStyle = turretColor;
+  g.beginPath();
+  g.moveTo(-16,7); g.lineTo(16,7); g.lineTo(9,-10); g.lineTo(-9,-10);
+  g.closePath(); g.fill();
+  g.strokeStyle='rgba(0,0,0,0.3)'; g.stroke();
+  if(color.rivets){
+    drawRivets(g,-14,6,14,6,7);
+    drawRivets(g,-8,-9,8,-9,5);
+  }
+  g.fillStyle = shadeColor(turretColor,-15);
+  g.beginPath(); g.arc(-4,-2,3,0,Math.PI*2); g.fill();
+  if(color.camo){
+    // cúpula del comandante (más grande y prominente en el Panzer 35(t))
+    const domeR = color.key==='pz35t' ? 5.6 : 4.4;
+    g.fillStyle = shadeColor(turretColor,-12);
+    g.beginPath(); g.arc(3,-10,domeR,0,Math.PI*2); g.fill();
+    g.strokeStyle='rgba(0,0,0,0.3)'; g.stroke();
+    g.fillStyle='#f0ece0'; g.strokeStyle='#1a1a14'; g.lineWidth=0.6;
+    g.font='bold 9px monospace'; g.textAlign='center'; g.textBaseline='middle';
+    g.strokeText('811', -7, 5);
+    g.fillText('811', -7, 5);
+    g.lineWidth=1;
+  }
+  if(antenna){
+    g.strokeStyle='#2a2a24'; g.lineWidth=1.6;
+    g.beginPath(); g.moveTo(11,-7); g.lineTo(22,-37); g.stroke();
+    g.fillStyle='#2a2a24'; g.beginPath(); g.arc(22,-37,2.4,0,Math.PI*2); g.fill();
+    g.lineWidth=1;
+  }
+  g.restore();
+}
+
+function drawPartBarrel(g,x,y,scale,color,barrelLen,barrelW,angle){
+  g.save(); g.translate(x,y); g.rotate(angle||0); g.scale(scale,scale);
+  const turretColor = shadeColor(color.base,-15);
+  g.fillStyle = shadeColor(turretColor,-8);
+  g.fillRect(-5,-barrelW/2-1.5,9,barrelW+3);
+  g.fillStyle = '#1c1c1c';
+  g.fillRect(4,-barrelW/2,barrelLen,barrelW);
+  g.fillStyle = '#111';
+  g.fillRect(4+barrelLen-6,-barrelW/2-0.7,7,barrelW+1.4);
+  g.restore();
+}
+
+function drawPartTracks(g,x,y,scale,color,motionLines){
+  g.save(); g.translate(x,y); g.scale(scale,scale);
+  const hullW=64;
+  g.fillStyle='#17170f';
+  g.beginPath(); g.roundRect(-hullW/2-12,-9,hullW+24,18,8); g.fill();
+  g.strokeStyle='rgba(0,0,0,0.5)';
+  for(let tx=-hullW/2-11; tx<=hullW/2+11; tx+=5){ g.beginPath(); g.moveTo(tx,-9); g.lineTo(tx,9); g.stroke(); }
+  const wheelR = color.wheelR ? color.wheelR*0.97 : 7, count = color.wheelCount||6;
+  const span=hullW-6, start=-hullW/2+3;
+  for(let i=0;i<count;i++){
+    const wx = start + (span/(count-1))*i;
+    drawWheel(g, wx, 4, wheelR);
+  }
+  drawWheel(g, -hullW/2-9, 3, wheelR*1.08);
+  drawWheel(g, hullW/2+9, 3, wheelR*1.08);
+  if(motionLines){
+    g.strokeStyle='rgba(255,255,255,0.3)';
+    for(let i=0;i<motionLines;i++){ g.beginPath(); g.moveTo(-hullW/2-22-i*8,4); g.lineTo(-hullW/2-34-i*8,4); g.stroke(); }
+  }
+  g.restore();
+}
+
+function drawGarageScene(progress){
+  const gc = document.getElementById('garageCanvas');
+  if(!gc) return;
+  const g = gc.getContext('2d');
+  const CW = gc.width, CH = gc.height;
+  g.clearRect(0,0,CW,CH);
+  g.fillStyle = '#20241a';
+  g.fillRect(0,0,CW,CH);
+  g.strokeStyle = '#2a2f20';
+  for(let yy=0; yy<CH; yy+=32){ g.beginPath(); g.moveTo(0,yy); g.lineTo(CW,yy); g.stroke(); }
+
+  const ease = easeOutCubic(progress);
+  const armorStyle = getVisualStyle('armor');
+  const trackStyle = getVisualStyle('speed');
+  const turretStyle = getVisualStyle('reload');
+  const gunStyle = getVisualStyle('damage');
+  const motionLines = Math.min(Math.round(upgrades.speed/0.35), 5);
+  const gsG = GUN_STATS[equippedGun];
+  const barrelLen = gsG.barrelLen - 2;
+  const barrelW = gsG.barrelW;
+
+  const pos = {};
+  Object.keys(PART_LAYOUT).forEach(cat=>{
+    const L = PART_LAYOUT[cat];
+    pos[cat] = {
+      x: lerp(L.assembled.x, L.exploded.x, ease),
+      y: lerp(L.assembled.y, L.exploded.y, ease),
+      scale: lerp(ASSEMBLED_SCALE, L.explodedScale, ease)
+    };
+  });
+
+  // líneas guía + insignias numeradas (aparecen a medida que se separan las piezas)
+  g.globalAlpha = ease;
+  Object.keys(PART_LAYOUT).forEach(cat=>{
+    const L = PART_LAYOUT[cat], p = pos[cat];
+    g.strokeStyle = 'rgba(201,162,39,0.6)';
+    g.setLineDash([4,3]);
+    g.beginPath(); g.moveTo(L.badge.x, L.badge.y); g.lineTo(p.x, p.y); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = '#c9a227';
+    g.beginPath(); g.arc(L.badge.x, L.badge.y, 11, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#1a1d13';
+    g.font = 'bold 13px monospace'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillText(L.badge.num, L.badge.x, L.badge.y+1);
+    g.fillStyle = '#e8e3d0';
+    g.font = '11px monospace';
+    g.fillText(L.label, L.badge.x, L.badge.y+22);
+  });
+  g.globalAlpha = 1;
+
+  // piezas (orden: orugas, chasis, torreta, cañón)
+  drawPartTracks(g, pos.speed.x, pos.speed.y, pos.speed.scale, trackStyle, motionLines);
+  drawPartHull(g, pos.armor.x, pos.armor.y, pos.armor.scale, armorStyle, false);
+  drawPartTurret(g, pos.reload.x, pos.reload.y, pos.reload.scale, turretStyle, true);
+  const barrelAngle = lerp(PART_LAYOUT.damage.angleAssembled, PART_LAYOUT.damage.angleExploded, ease);
+  drawPartBarrel(g, pos.damage.x, pos.damage.y, pos.damage.scale, gunStyle, barrelLen, barrelW, barrelAngle);
+}
+
+function runExplodeAnimation(){
+  let start = null;
+  const duration = 800;
+  function frame(ts){
+    if(!start) start = ts;
+    const t = Math.min(1, (ts-start)/duration);
+    drawGarageScene(t);
+    if(t<1){ requestAnimationFrame(frame); }
+    else { attachGarageHotspots(); }
+  }
+  requestAnimationFrame(frame);
+}
+
+function attachGarageHotspots(){
+  const stage = document.getElementById('garageStage');
+  if(!stage) return;
+  stage.querySelectorAll('.hotspot').forEach(h=>h.remove());
+  const defs = [
+    { cat:'damage', left:32,  top:12,  width:180, height:88  },
+    { cat:'reload', left:222, top:0,   width:105, height:128 },
+    { cat:'armor',  left:122, top:138, width:136, height:74  },
+    { cat:'speed',  left:92,  top:258, width:196, height:74  },
+  ];
+  defs.forEach(d=>{
+    const el = document.createElement('div');
+    el.className = 'hotspot';
+    el.style.left = d.left+'px'; el.style.top = d.top+'px';
+    el.style.width = d.width+'px'; el.style.height = d.height+'px';
+    el.dataset.cat = d.cat;
+    el.onclick = ()=> renderPartsPanel(d.cat);
+    stage.appendChild(el);
+  });
+}
+
+let selectedCategory = null;
+
+function renderPartsPanel(cat){
+  selectedCategory = cat;
+  document.querySelectorAll('.hotspot').forEach(h=> h.classList.toggle('selected', h.dataset.cat===cat));
+  const meta = CATEGORY_META[cat];
+  const parts = PARTS_POOL.filter(p=>p.stat===cat);
+  const panel = document.getElementById('partsPanel');
+  const gunInfoHtml = cat==='damage'
+    ? `<p style="color:#9aa07a;margin:0 0 10px;">Cañón equipado: <b style="color:var(--accent);">${GUN_STATS[equippedGun].label}</b>
+       ${GUN_STATS[equippedGun].useAmmoType
+         ? `(${GUN_STATS[equippedGun].mag} rondas, recarga ${GUN_STATS[equippedGun].reloadSec}s)`
+         : `(1 ronda, recarga ${GUN_STATS[equippedGun].reloadSec}s)`}</p>`
+    : '';
+  panel.innerHTML = `
+    <h3 style="color:var(--accent);margin:0 0 4px;">${meta.label}</h3>
+    <p style="color:#83c5ff;margin:0 0 10px;">◆ MONEDA DE PARTES: <b id="garageCredits">${partsCoins}</b></p>
+    ${gunInfoHtml}
+    ${parts.map(part=>{
+      const owned = partsOwned.filter(p=>p===part.id).length;
+      const cost = partCost(part);
+      const equipped = part.gunType ? part.gunType===equippedGun : (part.visualId && part.visualId===equippedVisual[cat]);
+      return `<div class="partRow">
+        <div class="partName">${part.name}</div>
+        <div class="partFrom">de: ${part.tank}</div>
+        <div class="partDesc">${part.desc}${owned?` <br><i>Instalado x${owned}</i>`:''}${equipped?' <br><b style="color:var(--accent);">EQUIPADO</b>':''}</div>
+        <button class="upgrade-accent" data-part="${part.id}" data-cost="${cost}" ${equipped?'disabled':''}>${equipped?'En uso':'MEJORAR ('+cost+')'}</button>
+        ${owned?`<button class="delete-accent" data-remove-part="${part.id}" data-remove-stat="${part.stat}" data-remove-amount="${part.amount||0}" data-remove-gun="${part.gunType||''}">ELIMINAR</button>`:''}
+      </div>`;
+    }).join('')}
+  `;
+  panel.querySelectorAll('[data-part]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const cost = parseInt(btn.dataset.cost);
+      const partId = btn.dataset.part;
+      const part = PARTS_POOL.find(p=>p.id===partId);
+      if(partsCoins>=cost){
+        partsCoins -= cost;
+        partsOwned.push(partId);
+        if(part.gunType){
+          equippedGun = part.gunType;
+        } else {
+          upgrades[part.stat] += part.amount;
+        }
+        if(part.visualId) equippedVisual[cat] = part.visualId;
+        drawGarageScene(1);
+        renderPartsPanel(cat);
+      } else {
+        toast('Moneda azul insuficiente', 900);
+      }
+    };
+  });
+  panel.querySelectorAll('[data-remove-part]').forEach(btn=>btn.onclick=()=>{
+    const partId=btn.dataset.removePart;
+    const idx=partsOwned.indexOf(partId);
+    if(idx<0) return;
+    partsOwned.splice(idx,1);
+    const stat=btn.dataset.removeStat;
+    const amount=Number(btn.dataset.removeAmount||0);
+    const gun=btn.dataset.removeGun;
+    if(gun && equippedGun===gun) equippedGun='base';
+    if(!gun && amount) upgrades[stat]=Math.max(0,upgrades[stat]-amount);
+    if(equippedVisual[stat]===PARTS_POOL.find(p=>p.id===partId)?.visualId) equippedVisual[stat]=null;
+    renderPartsPanel(cat);
+  });
+}
+
+function showGarage(){
+  showScreen(`
+    <h2>GARAGE DE CAMPAÑA</h2>
+    <p>Subnivel ${campaign}-${subLevel} superado — ${campaignNames[campaign-1]}.<br>
+    Próxima misión: ${subLevel<5 ? `${campaignNames[campaign-1]} (subnivel ${subLevel+1}/5)` : (campaignNames[campaign]||'Final')}.<br>
+    Tu tanque entra al garage y se desarma pieza por pieza. Hacé clic sobre el cañón, la torreta, el chasis o las orugas para comprar repuestos recuperados de otros blindados.</p>
+    <img class="reference-art" src="loco.jpg" alt="Referencia visual del centro de mando">
+    <div class="garage-toolbar">
+      <button class="action-upgrade">VERDE · MEJORAS</button>
+      <button class="action-delete">ROJO · ELIMINAR PIEZA</button>
+      <button class="action-ammo">MARRÓN · MUNICIÓN</button>
+      <button class="action-map" id="garageMapBtn">BLANCO · MAPA</button>
+    </div>
+    <div class="wallets"><span class="wallet ammo-wallet">◆ MONEDA AMARILLA (MUNICIÓN): <b id="garageAmmoCoins">${ammoCoins}</b></span><span class="wallet parts-wallet">◆ MONEDA AZUL (PARTES): <b id="garagePartsCoins">${partsCoins}</b></span><span class="wallet" style="color:#c88be8;">◆ TANQUE DEL JUGADOR</span></div>
+    <div class="ammo-shop"><h3>◆ MUNICIÓN · moneda amarilla</h3><div>Compra una reserva para tu próximo despliegue:</div><button data-buy-ammo="5">COMPRAR +5 RONDAS · 5 ◆</button> <button data-buy-ammo="15">COMPRAR +15 RONDAS · 14 ◆</button></div>
+    <div style="display:flex;gap:22px;align-items:flex-start;justify-content:center;flex-wrap:wrap;">
+      <div id="garageStage" style="border:2px solid var(--ui-purple);border-radius:6px;padding:2px;">
+        <canvas id="garageCanvas" width="380" height="360"></canvas>
+      </div>
+      <div id="partsPanel">
+        <p style="color:#9aa07a;">Hacé clic en una pieza del tanque para ver los repuestos disponibles para esa parte.</p>
+      </div>
+    </div>
+    <button id="nextBtn" style="margin-top:16px;">SIGUIENTE MISIÓN ▶</button>
+  `);
+
+  runExplodeAnimation();
+
+  document.querySelectorAll('[data-buy-ammo]').forEach(btn=>btn.onclick=()=>{
+    const amount=Number(btn.dataset.buyAmmo), cost=amount===5?5:14;
+    if(ammoCoins<cost){toast('Moneda amarilla insuficiente',900);return;}
+    ammoCoins-=cost; ammoReserve+=amount;
+    document.getElementById('garageAmmoCoins').textContent=ammoCoins;
+    toast(`Reserva de munición +${amount}`,900);
+  });
+  document.getElementById('garageMapBtn').onclick=showCampaignMap;
+
+  document.getElementById('nextBtn').onclick = ()=>{
+    level++;
+    hideScreen();
+    initLevel();
+    running=true;
+    loop();
+  };
+}
+
+startBtn.onclick = ()=>{
+  if(!tutorialFinished){ showTutorial(); return; }
+  hideScreen();
+  initLevel();
+  running=true;
+  loop();
+};
+document.getElementById('mapBtn').onclick = ()=> tutorialFinished ? showCampaignMap() : showTutorial();
+document.getElementById('tutorialBtn').onclick = showTutorial;
+document.getElementById('upgradeBtn').onclick = ()=> tutorialFinished ? showCommandUpgrades() : showTutorial();
+document.getElementById('ammoBtn').onclick = ()=> tutorialFinished ? showAmmoShop() : showTutorial();
+if(tutorialFinished){
+  startBtn.disabled=false;
+  startBtn.textContent='INICIAR MISIÓN';
+}
+
+})();
+</script>
+</body>
+</html>

@@ -96,6 +96,12 @@ export const login = async (req, res) => {
 
     // Obtener datos del jugador
     const player = await Player.findOne({ userId: user._id });
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        message: 'No existe un perfil de jugador para esta cuenta'
+      });
+    }
 
     const token = generateToken(user._id);
 
