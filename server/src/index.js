@@ -43,22 +43,54 @@ io.on('connection', (socket) => {
 
   socket.on('player:join', (playerData) => {
     console.log(`✅ Jugador ${playerData.name} se unió (${socket.id})`);
-    players.set(socket.id, { ...playerData, socketId: socket.id });
+    const state = {
+      playerId: socket.id,
+      name: String(playerData.name || 'Jugador').slice(0, 32),
+      level: Number(playerData.level) || 1,
+      x: 120,
+      turretAngle: 0.15,
+      facing: 1,
+      hp: 100,
+      maxHp: 100,
+      campaign: 1,
+      subLevel: 1,
+      socketId: socket.id
+    };
+    players.set(socket.id, state);
+
+    socket.emit('world:snapshot', Array.from(players.values()));
     
     // Notificar a todos los clientes que un nuevo jugador se unió
-    io.emit('player:joined', { 
-      playerId: socket.id, 
-      player: playerData,
-      totalPlayers: players.size 
-    });
+    socket.broadcast.emit('player:joined', { player: state, totalPlayers: players.size });
     
     socket.emit('game:ready');
+  });
+
+  socket.on('player:requestSnapshot', () => {
+    socket.emit('world:snapshot', Array.from(players.values()));
+  });
+
+  socket.on('player:state', (incoming) => {
+    const current = players.get(socket.id);
+    if (!current || !incoming || typeof incoming !== 'object') return;
+    const number = (value, fallback, min, max) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback;
+    };
+    current.x = number(incoming.x, current.x, 0, 100000);
+    current.turretAngle = number(incoming.turretAngle, current.turretAngle, -2, 2);
+    current.facing = Number(incoming.facing) < 0 ? -1 : 1;
+    current.hp = number(incoming.hp, current.hp, 0, Math.max(current.maxHp, 1));
+    current.maxHp = number(incoming.maxHp, current.maxHp, 1, 100000);
+    current.campaign = number(incoming.campaign, current.campaign, 1, 99);
+    current.subLevel = number(incoming.subLevel, current.subLevel, 1, 99);
+    socket.broadcast.emit('player:state', { player: current });
   });
 
   socket.on('disconnect', () => {
     console.log(`❌ Jugador desconectado: ${socket.id}`);
     players.delete(socket.id);
-    io.emit('player:left', { 
+    socket.broadcast.emit('player:left', {
       playerId: socket.id,
       totalPlayers: players.size 
     });

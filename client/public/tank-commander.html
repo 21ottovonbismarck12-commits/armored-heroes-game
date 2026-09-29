@@ -382,10 +382,30 @@ let artilleryTargetX = null;
 let artilleryImpact = null;
 let artilleryShells = [];
 let artilleryDebris = [];
+const onlineMode = new URLSearchParams(location.search).get('online') === '1';
+let onlinePlayerId = null;
+const remotePlayers = new Map();
+let onlineFrame = 0;
 const ARTILLERY_RADIUS = 145;
 
 const GRAVITY = 0.14;
 const GROUND_MARGIN = 340;
+
+window.addEventListener('message', event=>{
+  if(event.source!==window.parent || event.data?.source!=='armored-heroes') return;
+  const {type, player, players, playerId}=event.data;
+  if(type==='identity'){ onlinePlayerId=playerId; return; }
+  if(type==='world:snapshot'){
+    remotePlayers.clear();
+    (players||[]).forEach(remote=>{ if(remote.playerId!==onlinePlayerId) remotePlayers.set(remote.playerId, remote); });
+  } else if(type==='player:joined' && player && player.playerId!==onlinePlayerId){
+    remotePlayers.set(player.playerId, player);
+  } else if(type==='player:state' && player && player.playerId!==onlinePlayerId){
+    remotePlayers.set(player.playerId, player);
+  } else if(type==='player:left'){
+    remotePlayers.delete(playerId);
+  }
+});
 
 // Geometría compartida del casco (dos rectángulos escalonados) y la torreta
 const WHEEL_Y = -8;
@@ -1156,7 +1176,7 @@ function drawTank(t, color, isPlayer){
   if(sx<-70 || sx>W+70) return;
   const gy = terrainY(t.x);
   const ang = terrainAngle(t.x);
-  const facing = isPlayer ? (t.facing||1) : (player.x < t.x ? -1 : 1);
+  const facing = isPlayer ? (t.facing||1) : (t.facing || (player.x < t.x ? -1 : 1));
   const gs = isPlayer ? GUN_STATS[t.gunType||'base'] : null;
 
   renderTank(ctx, {
@@ -1171,6 +1191,19 @@ function drawTank(t, color, isPlayer){
     turretNumber: isPlayer ? '811' : t.turretNumber,
     showHp:true, hpPct: t.hp/t.maxHp
   });
+}
+
+function drawRemoteTank(remote){
+  if(!player || !Number.isFinite(remote.x)) return;
+  drawTank({
+    x:remote.x, hp:remote.hp, maxHp:remote.maxHp||100,
+    turretAngle:remote.turretAngle||0.15, facing:remote.facing||1,
+    turretNumber:'ALLY'
+  }, tankColor('player'), false);
+  const sx=worldToScreenX(remote.x), gy=terrainY(remote.x);
+  if(sx<-80 || sx>W+80) return;
+  ctx.save();ctx.fillStyle='#c88be8';ctx.font='bold 10px monospace';ctx.textAlign='center';
+  ctx.fillText(remote.name||'ALIADO',sx,gy-62);ctx.restore();
 }
 
 function drawParticles(){
@@ -1445,9 +1478,19 @@ function spawnParticles(x,y,color,n=10){
   }
 }
 
+function publishOnlineState(){
+  if(!onlineMode || !player || window.parent===window) return;
+  window.parent.postMessage({source:'tank-commander',type:'state',state:{
+    x:player.x, turretAngle:player.turretAngle, facing:player.facing,
+    hp:player.hp, maxHp:player.maxHp, campaign, subLevel
+  }}, location.origin);
+}
+
 // ---------- Update ----------
 function update(){
   if(!running) return;
+  onlineFrame++;
+  if(onlineFrame%3===0) publishOnlineState();
   if(artilleryMode){
     updateHUD();
     return;
@@ -1875,6 +1918,7 @@ function render(){
   drawArtilleryEffects();
   drawFlag();
   drawParticles();
+  remotePlayers.forEach(drawRemoteTank);
   enemies.forEach(en=>{ if(!en.dead) drawTank(en, tankColor(en.kind), false); });
   infantry.forEach(inf=>{ if(!inf.dead) drawInfantry(inf); });
   atguns.forEach(atg=>{ if(!atg.dead) drawATGun(atg); });

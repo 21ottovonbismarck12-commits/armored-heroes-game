@@ -1,30 +1,46 @@
-# Integración de proyectos
 
-## Decisión
+## Modo online implementado
 
-Los proyectos no comparten la misma arquitectura: `armored-heroes-game` es React + Vite + Express/Socket.io/MongoDB, mientras que `tank-commander.html` es un juego Canvas autocontenido. Una mezcla directa habría duplicado entradas, ciclo de renderizado y estado de autenticación.
+El módulo Canvas se conecta con la sesión Socket.io mediante `postMessage`:
 
-La integración elegida es modular y reversible:
+- React envía al iframe la identidad y los eventos `world:snapshot`, `player:joined`, `player:state` y `player:left`.
+- El iframe envía cada pocos frames su posición, dirección, ángulo de torreta, vida y nivel.
+- El servidor valida límites numéricos y retransmite el estado a los demás sockets.
+- Los aliados remotos aparecen en el campo de batalla con su nombre y vida.
 
-- React sigue siendo la aplicación principal.
-- `client/public/tank-commander.html` conserva el juego Canvas completo.
-- `GameCanvas.jsx` lo carga dentro de un `iframe`, desde `/tank-commander.html`.
-- `client/public/loco.jpg` queda disponible para la interfaz del juego.
-- La sesión autenticada y el lobby online permanecen en React/Socket.io.
+Esta primera fase sincroniza movimiento y estado visual. El combate autoritativo online —disparos, colisiones, daño, recompensas y persistencia— debe implementarse después en el servidor para evitar trampas y divergencias entre clientes.
 
-## Desarrollo
+## Pasos para ejecutarlo online
 
-```bash
-npm run install:all
-npm run dev
-```
+1. Crear una base MongoDB Atlas y copiar su URI.
+2. En el servidor:
 
-El cliente usa Vite y el servidor usa Express/Socket.io. Para autenticación real hay que configurar `server/.env` a partir de `server/.env.example`, incluyendo `MONGODB_URI`, `JWT_SECRET` y `CLIENT_URL`.
+   ```bash
+   cp server/.env.example server/.env
+   ```
 
-## Producción
+3. Editar `server/.env`:
 
-```bash
-npm run build
-```
+   ```env
+   PORT=3001
+   CLIENT_URL=https://TU-DOMINIO-FRONTEND
+   MONGODB_URI=mongodb+srv://USUARIO:CONTRASEÑA@CLUSTER/armored-heroes
+   JWT_SECRET=una-clave-larga-y-aleatoria
+   NODE_ENV=production
+   ```
 
-El build del cliente incluye el iframe y sus recursos estáticos. La integración puede reemplazarse más adelante por un componente Phaser o por mensajes `postMessage` si se desea sincronizar progreso del Canvas con el perfil online.
+4. Publicar el cliente en Vercel, Netlify o un servidor estático.
+5. Publicar el servidor Node en Render, Railway, Fly.io o una VM con WebSocket habilitado.
+6. Configurar `VITE_SERVER_URL=https://TU-DOMINIO-SERVIDOR` al compilar el cliente:
+
+   ```bash
+   VITE_SERVER_URL=https://TU-DOMINIO-SERVIDOR npm run build:client
+   ```
+
+7. Probar:
+
+   ```bash
+   curl https://TU-DOMINIO-SERVIDOR/api/health
+   ```
+
+   Después, abrir dos navegadores, registrar dos usuarios y entrar a la misión. Ambos tanques deberían verse y moverse en el mismo mundo.
