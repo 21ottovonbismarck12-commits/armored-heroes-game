@@ -1,10 +1,13 @@
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { Scene } from '@babylonjs/core/scene';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import '@babylonjs/loaders/glTF';
 import { ModularTank, DEFAULT_LOADOUT } from './modularTank';
 import { createMaterials } from './materials';
 
@@ -51,6 +54,21 @@ function createMuzzleFlash(scene, materials, tank) {
   return flash;
 }
 
+async function loadImportedTank(scene, fileName, position, rotationY, displayHeight = 1.8) {
+  const imported = await SceneLoader.ImportMeshAsync('', '/assets/tanks/', fileName, scene);
+  const root = new TransformNode(`${fileName}-display-root`, scene);
+  imported.meshes.forEach((mesh) => {
+    if (mesh !== root) mesh.parent = root;
+  });
+  const bounds = root.getHierarchyBoundingVectors(true);
+  const height = Math.max(0.001, bounds.max.y - bounds.min.y);
+  const factor = displayHeight / height;
+  root.scaling.setAll(factor);
+  root.position.set(position.x, position.y - bounds.min.y * factor, position.z);
+  root.rotation.y = rotationY;
+  return root;
+}
+
 export async function createGameScene(engine, canvas, options = {}) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.035, 0.045, 0.04, 0.18);
@@ -71,6 +89,10 @@ export async function createGameScene(engine, canvas, options = {}) {
   const tank = new ModularTank(scene, materials, options.loadout || DEFAULT_LOADOUT);
   tank.root.position.y = 0;
   const muzzleFlash = createMuzzleFlash(scene, materials, tank);
+  const importedTanks = await Promise.all([
+    loadImportedTank(scene, 'a34-comet.glb', new Vector3(-6, 0, -5), Math.PI * 0.18, 1.9),
+    loadImportedTank(scene, 'm4a2-sherman.glb', new Vector3(6, 0, -6), -Math.PI * 0.22, 1.85),
+  ]);
   const input = { forward: false, backward: false, left: false, right: false, turretLeft: false, turretRight: false };
   const onKey = (event) => {
     const down = event.type === 'keydown';
@@ -96,11 +118,13 @@ export async function createGameScene(engine, canvas, options = {}) {
     scene,
     tank,
     camera,
+    importedTanks,
     setLoadout(loadout) { tank.setLoadout(loadout); },
     dispose() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKey);
       tank.dispose();
+      importedTanks.forEach((model) => model.dispose(false, true));
       scene.dispose();
     },
   };
