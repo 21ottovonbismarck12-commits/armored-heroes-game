@@ -1,64 +1,15 @@
-# Armored Heroes Online
 
-Plataforma web de combate blindado con autenticación, progresión, equipamiento y multijugador base. Incluye el juego Canvas **Tank Commander** como módulo jugable integrado.
+## Prototipo 3D modular
 
-## Características
-
-- **Frontend React + Vite** con login, registro y lobby.
-- **Servidor Node.js + Express + Socket.io**.
-- **Persistencia MongoDB** para usuarios, jugadores, inventario y registros de combate.
-- **Combate por turnos** con recompensas y generación de objetos.
-- **Tank Commander integrado** en `client/public/tank-commander.html`, cargado desde `GameCanvas.jsx`.
-- **Recursos del juego** en `client/public/`, incluida la imagen `loco.jpg`.
-
-## Estructura
-
-```text
-armored-heroes-game/
-├── client/
-│   ├── index.html
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── GameCanvas.jsx       # módulo Tank Commander
-│   │   └── main.jsx
-│   └── public/
-│       ├── tank-commander.html
-│       └── loco.jpg
-├── server/
-│   └── src/
-├── INTEGRATION.md
-└── package.json
-```
-
-## Instalación
-
-Requisitos: Node.js 18+, npm y MongoDB local o Atlas.
+La rama principal incluye una primera arena 3D experimental con Babylon.js. Se puede probar sin backend mediante:
 
 ```bash
-npm run install:all
-cp server/.env.example server/.env
-# Edita server/.env con MONGODB_URI y JWT_SECRET
-npm run dev
+npm run dev --prefix client
+# abrir http://localhost:5173/?demo=3d
 ```
 
-El cliente se sirve con Vite y el servidor escucha normalmente en el puerto `3001`. Para producción:
+El prototipo incluye un tanque construido por piezas separadas: chasis, orugas, torreta y cañón. Usa `WASD` para mover, las flechas izquierda/derecha para girar la torreta y la rueda del mouse para controlar la cámara. El panel **GARAGE MODULAR** permite cambiar las piezas durante la partida y recalcula vida, blindaje, velocidad y daño.
 
-```bash
-npm run build
-npm start
-```
+El modelo actual es procedural para validar la mecánica y los puntos de montaje. Los modelos GLB de CGTrader o Sketchfab pueden sustituirse después respetando el mismo contrato de piezas. Los assets extraídos de videojuegos comerciales no deben incorporarse sin autorización de sus titulares.
 
-## Integración
-
-La integración es modular: React gestiona la cuenta y el lobby, mientras que el juego Canvas conserva su ciclo de renderizado y se muestra dentro de un iframe. Esto evita mezclar de forma insegura el estado de React con el estado interno del juego. Consulta [INTEGRATION.md](./INTEGRATION.md) para conocer la decisión y una posible evolución con `postMessage`.
-
-## Validación realizada
-
-- `npm run build` pasa para cliente y servidor.
-- Todos los imports locales existen.
-- El motor de combate fue probado con una simulación real.
-- La dependencia inválida `jsonwebtoken@^9.1.1` se corrigió a `^9.0.3`.
-
-## Licencia
-
-MIT
+Para una demostración visual sin login se utiliza `?demo=3d`; el acceso normal sigue pasando por autenticación y el modo clásico 2D permanece disponible desde el botón **Modo clásico 2D**.

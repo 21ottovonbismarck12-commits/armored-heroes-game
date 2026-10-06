@@ -87,6 +87,24 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('player:state', { player: current });
   });
 
+  socket.on('player:loadout', (payload) => {
+    const current = players.get(socket.id);
+    const loadout = payload?.loadout;
+    if (!current || !loadout || typeof loadout !== 'object') return;
+    const allowed = {
+      hull: ['panzer3', 't34', 'is2'],
+      tracks: ['bt5', 'panzer4', 't34'],
+      turret: ['panzer4', 't34', 'stug'],
+      gun: ['stuart37', 'panzer50', 'is2_122']
+    };
+    const clean = {};
+    for (const [slot, choices] of Object.entries(allowed)) {
+      if (choices.includes(loadout[slot])) clean[slot] = loadout[slot];
+    }
+    current.loadout = { ...(current.loadout || {}), ...clean };
+    socket.broadcast.emit('player:loadout', { playerId: socket.id, loadout: current.loadout });
+  });
+
   socket.on('disconnect', () => {
     console.log(`❌ Jugador desconectado: ${socket.id}`);
     players.delete(socket.id);
